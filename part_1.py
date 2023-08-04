@@ -119,6 +119,26 @@ def main(argv=None):
     plt.show(block=True)
 
 
+def convolve_rgb_image(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """
+    Convolves an RGB image with a given kernel.
+    :param image: The image to convolve.
+    :param kernel: The kernel to convolve the image with.
+    :return: The convolved image.
+    """
+    # extract the red, green and blue channels of the image
+    # and convolve each channel with the kernel separately.
+    # finally, stack the convolved channels to form the convolved image.
+    # mode='valid' means that there is no padding in the edges of the image.
+    # so the output image is smaller than the input.
+    # axis=2 means that the convolution is performed on the third axis of the image.
+    # (adding a third dimension to the image)
+    red = sg.correlate2d(image[:, :, 0], kernel, mode='valid')
+    green = sg.correlate2d(image[:, :, 1], kernel, mode='valid')
+    blue = sg.correlate2d(image[:, :, 2], kernel, mode='valid')
+    return np.stack([red, green, blue], axis=2)
+
+
 
 if __name__ == '__main__':
     main()
