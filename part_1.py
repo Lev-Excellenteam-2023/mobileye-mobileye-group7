@@ -120,5 +120,40 @@ def main(argv=None):
 
 
 
-if __name__ == '__main__':
-    main()
+# if __name__ == '__main__':
+#     main()
+
+
+path = r"images_set/aachen_000016_000019_leftImg8bit.png"
+path2 =r"images_set/aachen_000011_000019_leftImg8bit.png"
+# open image
+image = Image.open(path2)
+# convert image to numpy array
+c_image = np.array(image)
+plt.imshow(c_image)
+plt.show()
+
+
+
+kernel = np.load(r"kernels/traffic_light_kernel.npy")
+green_kernel = np.array(kernel)
+green_kernel = green_kernel[:, :, 1]
+green_kernel = green_kernel.astype(np.float64)
+# convert the kernel to 0-1 values and normalize it to sum up to 0.
+green_kernel = green_kernel / np.sum(green_kernel)
+# make the kernel high-pass filter. (sum of the kernel values is 0)
+green_kernel = green_kernel - np.mean(green_kernel)
+
+green_channel = c_image[:, :, 0]
+green_channel[green_channel < 100] = 0
+green_channel = sg.convolve2d(green_channel, green_kernel, mode='same')
+green_channel[green_channel < 0] = 0
+fig=plt.figure()
+ax1 = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
+ax1.imshow(green_channel)
+ax2.imshow(c_image)
+
+plt.show()
+
+
