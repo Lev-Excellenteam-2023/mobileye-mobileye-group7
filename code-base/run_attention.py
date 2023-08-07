@@ -59,26 +59,22 @@ def circle_kernael(size:int, radius:int ,shift:int):
     return kernel
 
 
-def find_tfl_points ( image_color_channel: np.ndarray,threshold:int) -> List[List[int]]:
+def find_light_point(image_c, threshold_value):
     """
-    Find the TFL points in the image.
-    :param image_color_channel: The image one color channel to find the TFL points in.
-    :param threshold: The threshold to use for the points.
-    :return: A list of suspicious points.
+    get- image_array
+        threshold_value-
+    return list of cord(x,y) of the lightest points in the image
     """
-
-
-    # find the maximum points in the image
-    rows , cols = np.where(image_color_channel > threshold)
-    result = [rows, cols]
-    # if cordinates are close to each other, take the average
-    # for i in range(0, len(result)):
-    #     for j in range(i+1, len(result)):
-    #         if abs(result[i][0] - result[j][0]) < 5 and abs(result[i][1] - result[j][1]) < 5:
-    #             result[i][0] = (result[i][0] + result[j][0])/2
-    #             result[i][1] = (result[i][1] + result[j][1])/2
-    #             result.remove(result[j])
-    return result
+    midpoints=[]
+    filter_size = 15
+    filtered_image = maximum_filter(image_c, size=filter_size)
+    # Invert pixel values using a for loop
+    for i in range(image_c.shape[0]):
+        for j in range(image_c.shape[1]):
+            if (image_c[i,j]==filtered_image[i,j]) and image_c[i,j]>threshold_value:
+              #  print( image_c[i, j])
+                midpoints.append((i,j))
+    return midpoints
 
 
 
@@ -96,50 +92,22 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     kernel = kernel.astype(np.float32)
     green_channel = c_image[:,:,1]
     red_chanel = c_image[:,:,0]
-    # low_pass_kernel = [[1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9]]
-    # green_channel = convolve_2d_with_kernel(green_channel, low_pass_kernel)
-    # red_chanel = convolve_2d_with_kernel(red_chanel, low_pass_kernel)
     filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
-
     filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
-    filtered_green_chanel[filtered_green_chanel < 28] = 0
-    filtered_red_chanel[filtered_red_chanel < 28] = 0
-    fig = plt.figure()
-    ax1 = fig.add_subplot(131)
-    ax2 = fig.add_subplot(132)
-    ax3 = fig.add_subplot(133)
-    ax1.imshow(c_image)
-    ax2.imshow(filtered_red_chanel)
-    ax3.imshow(filtered_green_chanel)
-    # plt.show()
-    red_peaks = find_tfl_points(filtered_red_chanel,40)
-    green_peaks = find_tfl_points(filtered_green_chanel,40)
-    red_peaks_x = red_peaks[1]
-    red_peaks_y = red_peaks[0]
-    green_peaks_x = green_peaks[1]
-    # green_peaks_y = green_peaks[0]
-    # return {X: red_peaks_x + green_peaks_x,
-    #         Y: red_peaks_y + green_peaks_y,
-    #         COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
-    #         }
-
-
-
-    # Okay... Here's an example of what this function should return. You will write your own of course
-    x_red: List[float] = (np.arange(-100, 100, 20) + c_image.shape[1] / 2).tolist()
-    y_red: List[float] = [c_image.shape[0] / 2 - 120] * len(x_red)
-    x_green: List[float] = x_red
-    y_green: List[float] = [c_image.shape[0] / 2 - 100] * len(x_red)
-
-    if kwargs.get('debug', False):
-        # This is here just so you know you can do it... Look at parse_arguments() for details
-        if np.random.rand() > kwargs.get('some_threshold', 0) / 45:
-            print("You're lucky, aren't you???")
-
-    return {X: x_red + x_green,
-            Y: y_red + y_green,
-            COLOR: [RED] * len(x_red) + [GRN] * len(x_green),
+    red_peaks = find_light_point(filtered_red_chanel, 28)
+    green_peaks = find_light_point(filtered_green_chanel, 28)
+    red_peaks_x = [x[1] for x in red_peaks]
+    red_peaks_y = [x[0] for x in red_peaks]
+    green_peaks_x = [x[1] for x in green_peaks]
+    green_peaks_y = [x[0] for x in green_peaks]
+    return {X: red_peaks_x + green_peaks_x,
+            Y: red_peaks_y + green_peaks_y,
+            COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
             }
+
+
+
+
 def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
     """
     Run the attention code-base
