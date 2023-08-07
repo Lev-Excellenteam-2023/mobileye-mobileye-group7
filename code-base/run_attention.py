@@ -26,6 +26,63 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 
+
+
+def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same'):
+    """
+    Convolve a 2D image with a given kernel.
+    :param image: a 2D array.
+    :param kernel: a 2D array.
+    :return: The convolved image.
+    """
+    return sg.convolve2d(image_channel, kernel, mode=mode)
+def circle_kernael(size:int, radius:int ,shift:int):
+    """
+    Creates a circle kernel.
+    :param size: The size of the kernel.
+    :param radius: The radius of the circle.
+    :return: The circle kernel normalized to sum up to 0.
+    """
+    kernel = np.zeros((size, size))
+    center = size // 2
+    for i in range(size):
+        for j in range(size):
+            # calculate the distance from the center of the kernel.
+            dist = np.sqrt((i - center) ** 2 + (j - center) ** 2)
+            dist = dist - shift
+            dist = 0 if dist < 0 else dist
+            dist = np.clip(dist, 0, radius)
+            # make the kernel values -1 to 1. 1 in the center of the kernel and -1 in the edges.
+            kernel[i, j] = 5 - dist / radius
+    # make the kernel high-pass filter. (sum of the kernel values is 0)
+    kernel = kernel - np.mean(kernel)
+    return kernel
+
+
+def find_tfl_points ( image_color_channel: np.ndarray,threshold:int) -> List[List[int]]:
+    """
+    Find the TFL points in the image.
+    :param image_color_channel: The image one color channel to find the TFL points in.
+    :param threshold: The threshold to use for the points.
+    :return: A list of suspicious points.
+    """
+
+
+    # find the maximum points in the image
+    rows , cols = np.where(image_color_channel > threshold)
+    result = [rows, cols]
+    # if cordinates are close to each other, take the average
+    # for i in range(0, len(result)):
+    #     for j in range(i+1, len(result)):
+    #         if abs(result[i][0] - result[j][0]) < 5 and abs(result[i][1] - result[j][1]) < 5:
+    #             result[i][0] = (result[i][0] + result[j][0])/2
+    #             result[i][1] = (result[i][1] + result[j][1])/2
+    #             result.remove(result[j])
+    return result
+
+
+
+
 def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     """
     Detect candidates for TFL lights. Use c_image, kwargs and you imagination to implement.
@@ -35,6 +92,24 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     :return: Dictionary with at least the following keys: 'x', 'y', 'col', each containing a list (same lengths).
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
+    kernel = circle_kernael(23, 7, 4)
+    kernel = kernel.astype(np.float64)
+    green_channel = c_image[:,:,1]
+    red_chanel = c_image[:,:,0]
+    filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
+    filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
+    red_peaks = find_tfl_points(filtered_red_chanel,40)
+    green_peaks = find_tfl_points(filtered_green_chanel,40)
+    red_peaks_x = red_peaks[1]
+    red_peaks_y = red_peaks[0]
+    green_peaks_x = green_peaks[1]
+    # green_peaks_y = green_peaks[0]
+    # return {X: red_peaks_x + green_peaks_x,
+    #         Y: red_peaks_y + green_peaks_y,
+    #         COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
+    #         }
+
+
 
     # Okay... Here's an example of what this function should return. You will write your own of course
     x_red: List[float] = (np.arange(-100, 100, 20) + c_image.shape[1] / 2).tolist()
@@ -224,3 +299,5 @@ def main(argv=None):
 
 if __name__ == '__main__':
     main()
+
+
