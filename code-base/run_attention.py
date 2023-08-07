@@ -1,6 +1,7 @@
 # This file contains the skeleton you can use for traffic light attention
 import json
 import argparse
+import math
 from datetime import datetime
 from argparse import Namespace
 from pathlib import Path
@@ -65,18 +66,18 @@ def find_light_point(image_c, threshold_value):
         threshold_value-
     return list of cord(x,y) of the lightest points in the image
     """
-    midpoints=[]
-    filter_size = 15
+    peaks_x=[]
+    peaks_y=[]
+    filter_size = 50
     filtered_image = maximum_filter(image_c, size=filter_size)
     # Invert pixel values using a for loop
     for i in range(image_c.shape[0]):
         for j in range(image_c.shape[1]):
             if (image_c[i,j]==filtered_image[i,j]) and image_c[i,j]>threshold_value:
               #  print( image_c[i, j])
-                midpoints.append((i,j))
-    return midpoints
-
-
+              peaks_y.append(i)
+              peaks_x.append(j)
+    return peaks_x, peaks_y
 
 
 def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
@@ -94,18 +95,70 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     red_chanel = c_image[:,:,0]
     filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
     filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
-    red_peaks = find_light_point(filtered_red_chanel, 28)
-    green_peaks = find_light_point(filtered_green_chanel, 28)
-    red_peaks_x = [x[1] for x in red_peaks]
-    red_peaks_y = [x[0] for x in red_peaks]
-    green_peaks_x = [x[1] for x in green_peaks]
-    green_peaks_y = [x[0] for x in green_peaks]
+    red_peaks_x,red_peaks_y= find_light_point(filtered_red_chanel, 28)
+    green_peaks_x,green_peaks_y= find_light_point(filtered_green_chanel, 28)
+    delete_duplicate(red_peaks_x,red_peaks_y,green_peaks_x,green_peaks_y,c_image)
+    print(red_peaks_x)
+    print(red_peaks_y)
+    print(green_peaks_x)
+    print(green_peaks_y)
+
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
             }
 
+def delete_duplicate(red_peaks_x:list,red_peaks_y:list,
+                     green_peaks_x:list,green_peaks_y:list,c_image: np.ndarray):
+    """
+    Finds nearby points (up to three co-ordinates on the X or Y axis) in red and green and decides from which list to delete this point
+    """
+    for red_x, red_y in zip(red_peaks_x, red_peaks_y):
+        for green_x, green_y in zip(green_peaks_x, green_peaks_y):
+            if abs(red_x-green_x)<4 and abs(red_y-green_y)<4:
+                if isColorGreen(red_x,red_y,c_image):
+                    red_peaks_x.remove(red_x)
+                    red_peaks_y.remove(red_y)
+                else:
+                    green_peaks_x.remove(green_x)
+                    green_peaks_y.remove(green_y)
 
+
+def isColorGreen(center_x: int, center_y: int, c_image: np.ndarray):
+    """
+    Check if the green color is significantly larger than red within circles of increasing radius around the center point.
+
+    Args:
+        center_x (int): x-coordinate of the center point.
+        center_y (int): y-coordinate of the center point.
+        c_image (np.ndarray): The input image as a NumPy array (RGB format).
+
+    Returns:
+        bool: True if green is significantly larger than red in circles around the center point; False otherwise.
+    """
+    max_radius=10
+    threshold_ratio=1.3
+    for radius in range(1, max_radius + 1):
+        check_coords = []
+        # Iterate over points in the circle around the center point
+        for angle in np.linspace(0, 2 * math.pi, int(2 * math.pi * radius)):
+            point_x = int(center_x + radius * math.cos(angle))
+            point_y = int(center_y + radius * math.sin(angle))
+
+            # Ensure the point is within the image bounds
+            if 0 <= point_x < c_image.shape[1] and 0 <= point_y < c_image.shape[0]:
+                red_value = c_image[point_y, point_x, 0]
+                green_value = c_image[point_y, point_x, 1]
+
+                # Check if the green value is significantly larger than red
+                if green_value > threshold_ratio * red_value:
+                    check_coords.append('g') # Green is significantly larger than red within the circle
+                else:
+                    check_coords.append('r')
+        if check_coords.count('g')> check_coords.count('r'):
+            return True
+        elif check_coords.count('g') < check_coords.count('r'):
+            return False
 
 
 def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
