@@ -93,11 +93,25 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
     kernel = circle_kernael(23, 7, 4)
-    kernel = kernel.astype(np.float64)
+    kernel = kernel.astype(np.float32)
     green_channel = c_image[:,:,1]
     red_chanel = c_image[:,:,0]
+    # low_pass_kernel = [[1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9], [1 / 9, 1 / 9, 1 / 9]]
+    # green_channel = convolve_2d_with_kernel(green_channel, low_pass_kernel)
+    # red_chanel = convolve_2d_with_kernel(red_chanel, low_pass_kernel)
     filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
+
     filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
+    filtered_green_chanel[filtered_green_chanel < 28] = 0
+    filtered_red_chanel[filtered_red_chanel < 28] = 0
+    fig = plt.figure()
+    ax1 = fig.add_subplot(131)
+    ax2 = fig.add_subplot(132)
+    ax3 = fig.add_subplot(133)
+    ax1.imshow(c_image)
+    ax2.imshow(filtered_red_chanel)
+    ax3.imshow(filtered_green_chanel)
+    # plt.show()
     red_peaks = find_tfl_points(filtered_red_chanel,40)
     green_peaks = find_tfl_points(filtered_green_chanel,40)
     red_peaks_x = red_peaks[1]
