@@ -15,7 +15,18 @@ def make_crop(*args, **kwargs):
     'y0'  The smaller y value (the lower corner)
     'y1'  The bigger y value (the higher corner)
     """
-    return 1, 2, 3, 4, 'crop_data'
+    x = args[0]
+    y = args[1]
+    color = args[2]
+    # find coordinates of the crop to create a rectangle around the traffic light
+    x0 = x - 40
+    x1 = x + 40
+    y0 = y - 100 if color == 'r' else y - 40
+    y1 = y + 40 if color == 'r' else y + 100
+    return x, x, y, y, color
+
+
+
 
 
 def check_crop(*args, **kwargs):
@@ -53,9 +64,10 @@ def create_crops(df: DataFrame) -> DataFrame:
 
         # example code:
         # ******* rewrite ONLY FROM HERE *******
-        x0, x1, y0, y1, crop = make_crop(df[X], df[Y], 'and_everything_else_you_need_here (and you need)')
+      #  x0, x1, y0, y1, crop = make_crop(df[X], df[Y],df[COLOR])
+        x0, x1, y0, y1, crop = 0, 0, 0, 0, 0
         result_template[X0], result_template[X1], result_template[Y0], result_template[Y1] = x0, x1, y0, y1
-        crop_path: str = '/data/crops/my_crop_unique_name.probably_containing_the original_image_name+somthing_unique'
+        crop_path: str = '/data/crops/' + f'tfl_cropped_image_{df[SEQ_IMAG]} cord:({df[X], df[Y]})'
         # crop.save(CROP_DIR / crop_path)
         result_template[CROP_PATH] = crop_path
         result_template[IS_TRUE], result_template[IGNOR] = check_crop(df[GTIM_PATH],
