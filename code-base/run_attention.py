@@ -50,6 +50,7 @@ def circle_kernael(size:int, radius:int ,shift:int):
         for j in range(size):
             # calculate the distance from the center of the kernel.
             dist = np.sqrt((i - center) ** 2 + (j - center) ** 2)
+            # shift the distance to the center of the kernel. all values below the shift will be as the center.
             dist = dist - shift
             dist = 0 if dist < 0 else dist
             # clip the distance to the radius. all values above the radius will have the tiniest value. (a black circle
@@ -59,9 +60,8 @@ def circle_kernael(size:int, radius:int ,shift:int):
             kernel[i, j] = 1 - (dist / radius)
     # make the kernel high-pass filter. (sum of the kernel values is 0)
     kernel = kernel - np.mean(kernel)
+    # center of the kernel will be 1.
     kernel = kernel / np.max(kernel)
-    print(np.sum(kernel))
-
     # plt.imshow(kernel, cmap='gray')
     # plt.show()
     return kernel
@@ -118,7 +118,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     # plt.show()
 
     red_peaks = find_light_point(filtered_red_chanel, 100)
-    green_peaks = find_light_point(filtered_green_chanel, 100)
+    green_peaks = find_light_point(filtered_green_chanel, 90)
     red_peaks_x = [x[1] for x in red_peaks]
     red_peaks_y = [x[0] for x in red_peaks]
     green_peaks_x = [x[1] for x in green_peaks]
@@ -126,7 +126,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
-                }
+            'conv_im': filtered_green_chanel}
 
 
 
@@ -149,6 +149,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         ax = None
     # In case you want, you can pass any parameter to find_tfl_lights, because it uses **kwargs
     attention_dict: Dict[str, Any] = find_tfl_lights(image, some_threshold=42, debug=args.debug)
+    convolved_image =attention_dict.pop('conv_im')
     attention: DataFrame = pd.DataFrame(attention_dict)
     # Copy all image metadata from the row into the results, so we can track it later
     for k, v in row.items():
@@ -171,11 +172,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         plt.title('Original image.. Always try to compare your output to it')
         plt.plot(tfl_x[is_red], tfl_y[is_red], 'rx', markersize=4)
         plt.plot(tfl_x[~is_red], tfl_y[~is_red], 'g+', markersize=4)
-        # Now let's convolve. Cannot convolve a 3D image with a 2D kernel, so I create a 2D image
-        # Note: This image is useless for you, so you solve it yourself
-        useless_image: np.ndarray = np.std(image, axis=2)  # No. You don't want this line in your code-base
-        highpass_kernel_from_lecture: np.ndarray = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]) - 1 / 9
-        hp_result: np.ndarray = sg.convolve(useless_image, highpass_kernel_from_lecture, 'same')
+        hp_result: np.ndarray = convolved_image
         plt.subplot(212, sharex=ax, sharey=ax)
         plt.imshow(hp_result)
         plt.title('Some useless image for you')
