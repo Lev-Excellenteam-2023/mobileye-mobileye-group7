@@ -1,6 +1,7 @@
 # This file contains the skeleton you can use for traffic light attention
 import json
 import argparse
+import math
 from datetime import datetime
 from argparse import Namespace
 from pathlib import Path
@@ -10,7 +11,8 @@ from matplotlib.axes import Axes
 
 # Internal imports... Should not fail
 from consts import IMAG_PATH, JSON_PATH, NAME, SEQ_IMAG, X, Y, COLOR, RED, GRN, DATA_DIR, TFLS_CSV, CSV_OUTPUT, \
-    CSV_INPUT,SEQ, CROP_DIR, CROP_CSV_NAME, ATTENTION_RESULT, ATTENTION_CSV_NAME, ZOOM, RELEVANT_IMAGE_PATH, COL, ATTENTION_PATH
+    CSV_INPUT, SEQ, CROP_DIR, CROP_CSV_NAME, ATTENTION_RESULT, ATTENTION_CSV_NAME, ZOOM, RELEVANT_IMAGE_PATH, COL, \
+    ATTENTION_PATH
 from misc_goodies import show_image_and_gt
 from data_utils import get_images_metadata
 from crops_creator import create_crops
@@ -36,7 +38,9 @@ def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np
     :return: The convolved image.
     """
     return sg.convolve2d(image_channel, kernel, mode=mode)
-def circle_kernael(size:int, radius:int ,shift:int):
+
+
+def circle_kernael(size: int, radius: int, shift: int):
     """
     Creates a circle kernel.
     :param size: The size of the kernel.
@@ -67,24 +71,27 @@ def circle_kernael(size:int, radius:int ,shift:int):
     return kernel
 
 
-def find_light_point(image_c, threshold_value):
+def find_light_point(original_image, filtered_image, threshold_value, color):
     """
-    get- image_array
-        threshold_value-
+    get- original_image- array of the original image
+        filtered_image- array of image after convolving by red/green kernel
+        threshold_value- (int) the level of clarity we want to use to filter
+        color-string represent the color of the traffic light  "r" or "g"
     return list of cord(x,y) of the lightest points in the image
     """
-    midpoints = []
-    filter_size = 15
-    filtered_image = maximum_filter(image_c, size=filter_size)
+
+    peaks_x = []
+    peaks_y = []
+    filter_size = 50
+    max_filtered_image = maximum_filter(filtered_image, size=filter_size)
     # Invert pixel values using a for loop
-    for i in range(image_c.shape[0]):
-        for j in range(image_c.shape[1]):
-            if (image_c[i,j]==filtered_image[i,j]) and image_c[i,j]>threshold_value:
-              #  print( image_c[i, j])
-                midpoints.append((i,j))
-    return midpoints
-
-
+    for i in range(filtered_image.shape[0]):
+        for j in range(filtered_image.shape[1]):
+            if max_filtered_image[i, j] == filtered_image[i, j] and filtered_image[i, j] > threshold_value:
+                if checkColor(j, i, original_image) == color:
+                    peaks_y.append(i)
+                    peaks_x.append(j)
+    return peaks_x, peaks_y
 
 
 def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
@@ -101,35 +108,55 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
                        [1 / 9, 1 / 9, 1 / 9]])
     kernel = circle_kernael(25, 10, 6)
     kernel = kernel.astype(np.float32)
-    green_channel = c_image[:,:,1]
-    red_chanel = c_image[:,:,0]
-
-    # red_chanel = convolve_2d_with_kernel(red_chanel, low_pass_kernel)
-    # green_channel = convolve_2d_with_kernel(green_channel, low_pass_kernel)
-
+    green_channel = c_image[:, :, 1]
+    red_chanel = c_image[:, :, 0]
     filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
     filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
-    # filtered_red_chanel = convolve_2d_with_kernel(filtered_red_chanel, low_pass_kernel)
-    # filtered_green_chanel = convolve_2d_with_kernel(filtered_green_chanel, low_pass_kernel)
+    red_peaks_x, red_peaks_y = find_light_point(c_image, filtered_red_chanel, 100, "r")
+    green_peaks_x, green_peaks_y = find_light_point(c_image, filtered_green_chanel, 90, "g")
 
-    # plt.imshow(filtered_red_chanel, cmap='gray')
-    # plt.show()
-    # plt.imshow(filtered_green_chanel, cmap='gray')
-    # plt.show()
-
-    red_peaks = find_light_point(filtered_red_chanel, 100)
-    green_peaks = find_light_point(filtered_green_chanel, 90)
-    red_peaks_x = [x[1] for x in red_peaks]
-    red_peaks_y = [x[0] for x in red_peaks]
-    green_peaks_x = [x[1] for x in green_peaks]
-    green_peaks_y = [x[0] for x in green_peaks]
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
             'conv_im': filtered_green_chanel}
 
 
+def checkColor(center_x: int, center_y: int, c_image: np.ndarray):
+    """
+    Check if the green color is significantly larger than red within circles of increasing radius around the center point.
 
+    Args:
+        center_x (int): x-coordinate of the center point.
+        center_y (int): y-coordinate of the center point.
+        c_image (np.ndarray): The input image as a NumPy array (RGB format).
+
+    Returns:
+        bool: True if green is significantly larger than red in circles around the center point; False otherwise.
+    """
+    max_radius = 10
+    threshold_ratio = 1.2
+    for radius in range(1, max_radius + 1):
+        check_coords = []
+        # Iterate over points in the circle around the center point
+        for angle in np.linspace(0, 2 * math.pi, int(2 * math.pi * radius)):
+            point_x = int(center_x + radius * math.cos(angle))
+            point_y = int(center_y + radius * math.sin(angle))
+
+            # Ensure the point is within the image bounds
+            if 0 <= point_x < c_image.shape[1] and 0 <= point_y < c_image.shape[0]:
+                red_value = c_image[point_y, point_x, 0]
+                green_value = c_image[point_y, point_x, 1]
+
+                # Check if the green value is significantly larger than red
+                if green_value > red_value*threshold_ratio:
+                    check_coords.append('g')  # Green is significantly larger than red within the circle
+                elif green_value < red_value:
+                    check_coords.append('r')
+        if check_coords.count('g') > check_coords.count('r'):
+            return "g"
+        elif check_coords.count('g') < check_coords.count('r'):
+            return "r"
+    return "b"
 
 def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
     """
@@ -178,7 +205,6 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         plt.title('Some useless image for you')
         plt.suptitle("When you zoom on one, the other zooms too :-)")
     return attention
-
 
 def prepare_list(in_csv_file: Path, args: Namespace) -> DataFrame:
     """
@@ -291,5 +317,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
     main()
-
-
