@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 
 
-def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same'):
+def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np.ndarray:
     """
     Convolve a 2D image with a given kernel.
     :param image: a 2D array.
@@ -41,6 +41,7 @@ def circle_kernael(size:int, radius:int ,shift:int):
     Creates a circle kernel.
     :param size: The size of the kernel.
     :param radius: The radius of the circle.
+    :param shift: The shift from the center of the kernel. all values below the shift will be as the center.
     :return: The circle kernel normalized to sum up to 0.
     """
     kernel = np.zeros((size, size))
@@ -51,11 +52,18 @@ def circle_kernael(size:int, radius:int ,shift:int):
             dist = np.sqrt((i - center) ** 2 + (j - center) ** 2)
             dist = dist - shift
             dist = 0 if dist < 0 else dist
+            # clip the distance to the radius. all values above the radius will have the tiniest value. (a black circle
+            # around the kernel)
             dist = np.clip(dist, 0, radius)
             # make the kernel values -1 to 1. 1 in the center of the kernel and -1 in the edges.
-            kernel[i, j] = 5 - dist / radius
+            kernel[i, j] = 1 - (dist / radius)
     # make the kernel high-pass filter. (sum of the kernel values is 0)
     kernel = kernel - np.mean(kernel)
+    kernel = kernel / np.max(kernel)
+    print(np.sum(kernel))
+
+    # plt.imshow(kernel, cmap='gray')
+    # plt.show()
     return kernel
 
 
@@ -65,7 +73,7 @@ def find_light_point(image_c, threshold_value):
         threshold_value-
     return list of cord(x,y) of the lightest points in the image
     """
-    midpoints=[]
+    midpoints = []
     filter_size = 15
     filtered_image = maximum_filter(image_c, size=filter_size)
     # Invert pixel values using a for loop
@@ -88,14 +96,29 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     :return: Dictionary with at least the following keys: 'x', 'y', 'col', each containing a list (same lengths).
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
-    kernel = circle_kernael(23, 7, 4)
+    low_pass_kernel = np.array([[1 / 9, 1 / 9, 1 / 9],
+                       [1 / 9, 1 / 9, 1 / 9],
+                       [1 / 9, 1 / 9, 1 / 9]])
+    kernel = circle_kernael(25, 10, 6)
     kernel = kernel.astype(np.float32)
     green_channel = c_image[:,:,1]
     red_chanel = c_image[:,:,0]
+
+    # red_chanel = convolve_2d_with_kernel(red_chanel, low_pass_kernel)
+    # green_channel = convolve_2d_with_kernel(green_channel, low_pass_kernel)
+
     filtered_red_chanel = convolve_2d_with_kernel(red_chanel, kernel)
     filtered_green_chanel = convolve_2d_with_kernel(green_channel, kernel)
-    red_peaks = find_light_point(filtered_red_chanel, 28)
-    green_peaks = find_light_point(filtered_green_chanel, 28)
+    # filtered_red_chanel = convolve_2d_with_kernel(filtered_red_chanel, low_pass_kernel)
+    # filtered_green_chanel = convolve_2d_with_kernel(filtered_green_chanel, low_pass_kernel)
+
+    # plt.imshow(filtered_red_chanel, cmap='gray')
+    # plt.show()
+    # plt.imshow(filtered_green_chanel, cmap='gray')
+    # plt.show()
+
+    red_peaks = find_light_point(filtered_red_chanel, 100)
+    green_peaks = find_light_point(filtered_green_chanel, 100)
     red_peaks_x = [x[1] for x in red_peaks]
     red_peaks_y = [x[0] for x in red_peaks]
     green_peaks_x = [x[1] for x in green_peaks]
@@ -103,7 +126,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
-            }
+                }
 
 
 
@@ -159,63 +182,6 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         plt.suptitle("When you zoom on one, the other zooms too :-)")
     return attention
 
-# def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
-#     """
-#     Run the attention code-base
-#     """
-#     image_path: str = row[IMAG_PATH]
-#     json_path: str = row[JSON_PATH]
-#     image: np.ndarray = np.array(Image.open(image_path), dtype=np.float32) / 255
-#
-#     if args.debug and json_path is not None:
-#         # This code-base demonstrates the fact you can read the bounding polygons from the json files
-#         # Then plot them on the image. Try it if you think you want to. Not a must...
-#         gt_data: Dict[str, Any] = json.loads(Path(json_path).read_text())
-#         what: List[str] = ['traffic light']
-#         objects: List[Dict[str, Any]] = [o for o in gt_data['objects'] if o['label'] in what]
-#         ax: Optional[Axes] = show_image_and_gt(image, objects, f"{row[SEQ_IMAG]}: {row[NAME]} GT")
-#     else:
-#         ax = None
-#
-#     # In case you want, you can pass any parameter to find_tfl_lights, because it uses **kwargs
-#     attention_dict: Dict[str, Any] = find_tfl_lights(image, some_threshold=42, debug=args.debug)
-#     attention: DataFrame = pd.DataFrame(attention_dict)
-#
-#     # Copy all image metadata from the row into the results, so we can track it later
-#     for k, v in row.items():
-#         attention[k] = v
-#
-#     tfl_x: np.ndarray = attention[X].values
-#     tfl_y: np.ndarray = attention[Y].values
-#     color: np.ndarray = attention[COLOR].values
-#     is_red = color == RED
-#
-#     print(f"Image: {image_path}, {is_red.sum()} reds, {len(is_red) - is_red.sum()} greens..")
-#
-#     if args.debug:
-#         # And here are some tips & tricks regarding matplotlib
-#         # They will look like pictures if you use jupyter, and like magic if you use pycharm!
-#         # You can zoom one image, and the other will zoom accordingly.
-#         # I think you will find it very very useful!
-#         plt.figure(f"{row[SEQ_IMAG]}: {row[NAME]} detections")
-#         plt.clf()
-#         plt.subplot(211, sharex=ax, sharey=ax)
-#         plt.imshow(image)
-#         plt.title('Original image.. Always try to compare your output to it')
-#         plt.plot(tfl_x[is_red], tfl_y[is_red], 'rx', markersize=4)
-#         plt.plot(tfl_x[~is_red], tfl_y[~is_red], 'g+', markersize=4)
-#         # Now let's convolve. Cannot convolve a 3D image with a 2D kernel, so I create a 2D image
-#         # Note: This image is useless for you, so you solve it yourself
-#         useless_image: np.ndarray = np.std(image, axis=2)  # No. You don't want this line in your code-base
-#         highpass_kernel_from_lecture: np.ndarray = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]]) - 1 / 9
-#         hp_result: np.ndarray = sg.convolve(useless_image, highpass_kernel_from_lecture, 'same')
-#         plt.subplot(212, sharex=ax, sharey=ax)
-#         plt.imshow(hp_result)
-#         plt.title('Some useless image for you')
-#         plt.suptitle("When you zoom on one, the other zooms too :-)")
-#
-#     return attention
-#
 
 def prepare_list(in_csv_file: Path, args: Namespace) -> DataFrame:
     """
@@ -260,11 +226,9 @@ def run_on_list(meta_table: pd.DataFrame, func: callable, args: Namespace) -> pd
 def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
     if not ATTENTION_PATH.exists():
         ATTENTION_PATH.mkdir()
-
     # Order the df by sequence, a nice to have.
     crops_sorted: DataFrame = crops_df.sort_values(by=SEQ)
     results_sorted: DataFrame = results_df.sort_values(by=SEQ_IMAG)
-
     attention_df: DataFrame = DataFrame(columns=ATTENTION_RESULT)
     row_template: Dict[str, Any] = {RELEVANT_IMAGE_PATH: '', X: '', Y: '', ZOOM: 0, COL: ''}
     for index, row in results_sorted.iterrows():

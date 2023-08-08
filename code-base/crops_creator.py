@@ -6,7 +6,6 @@ from consts import CROP_DIR, CROP_RESULT, SEQ, IS_TRUE, IGNOR, CROP_PATH, X0, X1
 from pandas import DataFrame
 
 
-import pandas as pd
 def make_crop(*args, **kwargs):
     """
     The function that creates the crops from the image.
@@ -16,7 +15,18 @@ def make_crop(*args, **kwargs):
     'y0'  The smaller y value (the lower corner)
     'y1'  The bigger y value (the higher corner)
     """
-    return 1, 2, 3, 4, 'crop_data'
+    x = args[0]
+    y = args[1]
+    color = args[2]
+    # find coordinates of the crop to create a rectangle around the traffic light
+    x0 = x - 40
+    x1 = x + 40
+    y0 = y - 100 if color == 'r' else y - 40
+    y1 = y + 40 if color == 'r' else y + 100
+    return x, x, y, y, color
+
+
+
 
 
 def check_crop(*args, **kwargs):
@@ -32,8 +42,7 @@ def create_crops(df: DataFrame) -> DataFrame:
     # Your goal in this part is to take the coordinates you have in the df, run on it, create crops from them, save them
     # in the 'data' folder, then check if crop you have found is correct (meaning the TFL is fully contained in the
     # crop) by comparing it to the ground truth and in the end right all the result data you have in the following
-    # DataFrame
-    # (for doc about each field and its input, look at 'CROP_RESULT')
+    # DataFrame (for doc about each field and its input, look at 'CROP_RESULT')
     #
     # *** IMPORTANT ***
     # All crops should be the same size or smaller!!!
@@ -55,9 +64,10 @@ def create_crops(df: DataFrame) -> DataFrame:
 
         # example code:
         # ******* rewrite ONLY FROM HERE *******
-        x0, x1, y0, y1, crop = make_crop(df[X], df[Y], 'and_everything_else_you_need_here (and you need)')
+      #  x0, x1, y0, y1, crop = make_crop(df[X], df[Y],df[COLOR])
+        x0, x1, y0, y1, crop = 0, 0, 0, 0, 0
         result_template[X0], result_template[X1], result_template[Y0], result_template[Y1] = x0, x1, y0, y1
-        crop_path: str = '/data/crops/my_crop_unique_name.probably_containing_the original_image_name+somthing_unique'
+        crop_path: str = '/data/crops/' + f'tfl_cropped_image_{df[SEQ_IMAG]} cord:({df[X], df[Y]})'
         # crop.save(CROP_DIR / crop_path)
         result_template[CROP_PATH] = crop_path
         result_template[IS_TRUE], result_template[IGNOR] = check_crop(df[GTIM_PATH],
@@ -68,41 +78,3 @@ def create_crops(df: DataFrame) -> DataFrame:
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
         result_df = result_df._append(result_template, ignore_index=True)
     return result_df
-
-
-from PIL import Image
-import pandas as pd
-
-
-def create_crops(df: pd.DataFrame) -> pd.DataFrame:
-    # Initialize a DataFrame to store crop results
-    crop_results = pd.DataFrame(columns=['Crop_Path', 'Is_Correct'])
-
-    # Loop through the rows of the input DataFrame
-    for index, row in df.iterrows():
-        # Extract relevant information from the row
-        x, y, width, height = row['x'], row['y'], row['width'], row['height']
-        ground_truth_x, ground_truth_y, ground_truth_width, ground_truth_height = row['gt_x'], row['gt_y'], row[
-            'gt_width'], row['gt_height']
-        image_path = row['image_path']
-
-        # Load the image
-        image = Image.open(image_path)
-
-        # Create the crop
-        crop = image.crop((x, y, x + width, y + height))
-
-        # Check if the crop is correct (simplified for illustration)
-        is_correct = (x >= ground_truth_x) and (y >= ground_truth_y) and (
-                    x + width <= ground_truth_x + ground_truth_width) and (
-                                 y + height <= ground_truth_y + ground_truth_height)
-
-        # Save the crop
-        crop_path = f'data/crop_{index}.jpg'
-        crop.save(crop_path)
-
-        # Update the crop_results DataFrame
-        crop_results = crop_results.append({'Crop_Path': crop_path, 'Is_Correct': is_correct}, ignore_index=True)
-
-    return crop_results
-
