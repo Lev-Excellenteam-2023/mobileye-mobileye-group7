@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any
 
 import matplotlib.pyplot as plt
@@ -61,16 +62,39 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     return x, x, y, y, crop, ignore
 
 
-
-
-
-def check_crop(*args, **kwargs):
+def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str,ignor:bool) -> bool:
     """
-    Here you check if your crop contains a traffic light or not.
-    Try using the ground truth to do that (Hint: easier than you think for the simple cases, and if you found a hard
-    one, just ignore it for now :). )
+    Check if a given crop region intersects with any "traffic light" polygons in a JSON annotation file.
+
+    Parameters:
+    x0 (int): The leftmost x-coordinate of the crop region.
+    x1 (int): The rightmost x-coordinate of the crop region.
+    y0 (int): The topmost y-coordinate of the crop region.
+    y1 (int): The bottommost y-coordinate of the crop region.
+    image_path (str): Path to the image for which the annotation JSON is being checked.
+
+    Returns:
+    bool: True if the crop region intersects with any "traffic light" polygon, False otherwise.
     """
-    return True, kwargs['ignore']
+    if ignor:
+        return False
+    json_path = image_path.replace("_leftImg8bit.png", "_gtFine_polygons.json")
+
+    # Load the JSON data from the file
+    with open(json_path) as json_file:
+        data = json.load(json_file)
+
+        # Iterate through the "objects" array and find objects labeled as "traffic light"
+        for obj in data.get('objects', []):
+            if obj.get('label') == 'traffic light':
+                points = obj.get('polygon', [])
+                x_values, y_values = zip(*points)
+                min_x, max_x = min(x_values), max(x_values)
+                min_y, max_y = min(y_values), max(y_values)
+                if (x0 > min_x - 5 and x1 < max_x + 5 and y0 > min_y - 5 and y1 < max_y + 5):
+                    return True
+    return False
+
 
 
 def create_crops(df: DataFrame) -> DataFrame:
@@ -114,7 +138,7 @@ def create_crops(df: DataFrame) -> DataFrame:
         crop_image.save(CROP_DIR / crop_path)
 
         result_template[CROP_PATH] = crop_path
-        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop, x0, x1, y0, y1,ignore=ignore)
+        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop, x0, x1, y0, y1,row[IMAG_PATH],ignore=ignore)
         # ******* TO HERE *******
 
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
