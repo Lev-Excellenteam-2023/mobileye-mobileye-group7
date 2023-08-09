@@ -43,8 +43,8 @@ def convolve_rgb_image( image:np.ndarray, kernel, mode='same' ) -> \
 
     red = convolve_2d_with_kernel(image[:,:,0], kernel, mode=mode)
     green = convolve_2d_with_kernel(image[:,:,1], kernel, mode=mode)
-    red_peaks_x, red_peaks_y = find_light_point(image, red, RED_THRESHOLD, "r")
-    green_peaks_x, green_peaks_y = find_light_point(image, green, GREEN_THRESHOLD, "g")
+    red_peaks_x, red_peaks_y = find_light_point( red, RED_THRESHOLD, )
+    green_peaks_x, green_peaks_y = find_light_point(green, GREEN_THRESHOLD, )
     return red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y , red, green
 
 def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np.ndarray:
@@ -86,7 +86,7 @@ def circle_kernael(size: int, radius: int, shift: int):
     return kernel
 
 
-def find_light_point(original_image, filtered_image, threshold_value, color)->(List[int],List[int]):
+def find_light_point( filtered_image, threshold_value)->(List[int],List[int]):
     """
     get- original_image- array of the original image
         filtered_image- array of image after convolving by red/green kernel
@@ -103,11 +103,8 @@ def find_light_point(original_image, filtered_image, threshold_value, color)->(L
     for i in range(filtered_image.shape[0]):
         for j in range(filtered_image.shape[1]):
             if max_filtered_image[i, j] == filtered_image[i, j] and filtered_image[i, j] > threshold_value:
-                if checkColor(j, i, original_image) == color:
                     peaks_y.append(i)
                     peaks_x.append(j)
-                    # else:
-                #     print(f"not the right color: {color} in {j},{i}")
     return peaks_x, peaks_y
 
 
@@ -144,6 +141,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     :return: Dictionary with at least the following keys: 'x', 'y', 'col', each containing a list (same lengths).
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
+    original_image = c_image
     zoom_ratio = [0.85,0.5,0.3 ]
     kernel = circle_kernael(20, 5, 5)
 
@@ -157,6 +155,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     red_convolved: np.ndarray
     red_peaks_x, red_peaks_y ,green_peaks_x, green_peaks_y, green_convolved,red_convolved\
         = convolve_rgb_image(c_image, kernel)
+    filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, original_image)
     # rescale the coordinates to the original image scale (before removing the top and bottom parts)
 
 
@@ -170,6 +169,8 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
         red_peaks_y_new = [int(y / zoom_ratio[i]) for y in red_peaks_y_new]
         green_peaks_x_new = [int(x / zoom_ratio[i]) for x in green_peaks_x_new]
         green_peaks_y_new = [int(y / zoom_ratio[i]) for y in green_peaks_y_new]
+        filter_peaks(red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, original_image)
+
         red_peaks_x += red_peaks_x_new
         red_peaks_y += red_peaks_y_new
         green_peaks_x += green_peaks_x_new
@@ -181,9 +182,29 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
             'conv_im': red_convolved,'zoom':zoom}
 
+def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image):
+    """
+    Filter the lists of red and green peaks based on their color using the checkColor function.
+
+    Parameters:
+    red_peaks_x (list): List of x-coordinates of red peaks.
+    red_peaks_y (list): List of y-coordinates of red peaks.
+    green_peaks_x (list): List of x-coordinates of green peaks.
+    green_peaks_y (list): List of y-coordinates of green peaks.
+    c_image: The image for color checking.
+    """
+    for x, y in zip(red_peaks_x, red_peaks_y):
+        if check_color(x, y, c_image) != 'r' or y < 10:
+            red_peaks_x.remove(x)
+            red_peaks_y.remove(y)
+    for x, y in zip(green_peaks_x, green_peaks_y):
+        if check_color(x, y, c_image) != 'g' or y < 10:
+            green_peaks_x.remove(x)
+            green_peaks_y.remove(y)
 
 
-def checkColor(center_x: int, center_y: int, c_image: np.ndarray):
+
+def check_color(center_x: int, center_y: int, c_image: np.ndarray):
     """
     Check if the green color is significantly larger than red within circles of increasing radius around the center point.
 
