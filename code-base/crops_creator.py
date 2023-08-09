@@ -1,12 +1,16 @@
 from typing import Dict, Any
 
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+
 from consts import CROP_DIR, CROP_RESULT, SEQ, IS_TRUE, IGNOR, CROP_PATH, X0, X1, Y0, Y1, COLOR, SEQ_IMAG, COL, X, Y, \
-    GTIM_PATH
+    GTIM_PATH,IMAG_PATH
 
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 
-def make_crop(*args, **kwargs):
+def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     """
     The function that creates the crops from the image.
     Your return values from here should be the coordinates of the crops in this format (x0, x1, y0, y1, crop content):
@@ -15,15 +19,34 @@ def make_crop(*args, **kwargs):
     'y0'  The smaller y value (the lower corner)
     'y1'  The bigger y value (the higher corner)
     """
-    x = args[0]
-    y = args[1]
-    color = args[2]
+    row:Series = args[0]
+    x = row[X]
+    y = row[Y]
+    color = row[COLOR]
+    imag_path = row[IMAG_PATH]
+    c_image = np.array(Image.open(imag_path))
     # find coordinates of the crop to create a rectangle around the traffic light
-    x0 = x - 40
-    x1 = x + 40
-    y0 = y - 100 if color == 'r' else y - 40
-    y1 = y + 40 if color == 'r' else y + 100
-    return x, x, y, y, color
+    x0 = x - 8
+    x1 = x + 8
+    y0 = y - 25 if color == 'g' else y - 8
+    y1 = y + 8 if color == 'g' else y + 25
+    # check if the coordinates are out of the image
+    if x0 < 0:
+        x1 = x1 - x0
+        x0 = 0
+    if x1 > c_image.shape[1]:
+        x0 = x0 - (x1 - c_image.shape[1])
+        x1 = c_image.shape[1]
+    if y0 < 0:
+        y1 = y1 - y0
+        y0 = 0
+    if y1 > c_image.shape[0]:
+        y0 = y0 - (y1 - c_image.shape[0])
+        y1 = c_image.shape[0]
+    # create the crop
+    crop = c_image[int(y0):int(y1), int(x0):int(x1)]
+
+    return x, x, y, y, crop
 
 
 
@@ -64,15 +87,18 @@ def create_crops(df: DataFrame) -> DataFrame:
 
         # example code:
         # ******* rewrite ONLY FROM HERE *******
-      #  x0, x1, y0, y1, crop = make_crop(df[X], df[Y],df[COLOR])
-        x0, x1, y0, y1, crop = 0, 0, 0, 0, 0
+        x0, x1, y0, y1, crop = make_crop(row)
         result_template[X0], result_template[X1], result_template[Y0], result_template[Y1] = x0, x1, y0, y1
-        crop_path: str = '/data/crops/' + f'tfl_cropped_image_{df[SEQ_IMAG]} cord:({df[X], df[Y]})'
-        # crop.save(CROP_DIR / crop_path)
+        crop_path: str = f'tfl_cropped_image_{row[SEQ_IMAG]}_cord_({row[X],row[Y]})_{index}.png'
+        # converts the crop to an image and saves it in the 'data' folder
+        # create the png file
+        # print(np.max(crop))
+        # crop = crop.astype(np.uint8)
+        # crop_image = Image.fromarray(crop)
+        # crop_image.save(CROP_DIR / crop_path)
+
         result_template[CROP_PATH] = crop_path
-        result_template[IS_TRUE], result_template[IGNOR] = check_crop(df[GTIM_PATH],
-                                                                      crop,
-                                                                      'everything_else_you_need_here')
+        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop ,row, x0, x1, y0, y1)
         # ******* TO HERE *******
 
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
