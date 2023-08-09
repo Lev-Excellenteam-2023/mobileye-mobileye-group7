@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from consts import CROP_DIR, CROP_RESULT, SEQ, IS_TRUE, IGNOR, CROP_PATH, X0, X1, Y0, Y1, COLOR, SEQ_IMAG, COL, X, Y, \
-    GTIM_PATH,IMAG_PATH
+    GTIM_PATH, IMAG_PATH
 
 from pandas import DataFrame, Series
 
@@ -20,7 +20,7 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     'y0'  The smaller y value (the lower corner)
     'y1'  The bigger y value (the higher corner)
     """
-    row:Series = args[0]
+    row: Series = args[0]
     x = row[X]
     y = row[Y]
     color = row[COLOR]
@@ -36,7 +36,6 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
         y = int(y * zoom_rate)
         import run_attention
         c_image = run_attention.resize_image(copy_image, zoom_rate)
-
 
     # find coordinates of the crop to create a rectangle around the traffic light
     x0 = x - 12
@@ -62,7 +61,7 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     return x, x, y, y, crop, ignore
 
 
-def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str,ignor:bool) -> bool:
+def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignor: bool) -> bool:
     """
     Check if a given crop region intersects with any "traffic light" polygons in a JSON annotation file.
 
@@ -76,6 +75,7 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str,ignor:bool) -
     Returns:
     bool: True if the crop region intersects with any "traffic light" polygon, False otherwise.
     """
+    deviation = 5
     if ignor:
         return False
     json_path = image_path.replace("_leftImg8bit.png", "_gtFine_polygons.json")
@@ -91,10 +91,9 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str,ignor:bool) -
                 x_values, y_values = zip(*points)
                 min_x, max_x = min(x_values), max(x_values)
                 min_y, max_y = min(y_values), max(y_values)
-                if (x0 > min_x - 5 and x1 < max_x + 5 and y0 > min_y - 5 and y1 < max_y + 5):
+                if x0 - deviation < min_x and x1 + deviation > max_x and y0 - deviation < min_y and y1 + deviation > max_y:
                     return True
     return False
-
 
 
 def create_crops(df: DataFrame) -> DataFrame:
@@ -129,7 +128,7 @@ def create_crops(df: DataFrame) -> DataFrame:
         # ******* rewrite ONLY FROM HERE *******
         x0, x1, y0, y1, crop, ignore = make_crop(row)
         result_template[X0], result_template[X1], result_template[Y0], result_template[Y1] = x0, x1, y0, y1
-        crop_path: str = f'tfl_cropped_image_{row[SEQ_IMAG]}_cord_{int(row[X]),int(row[Y])}.png'
+        crop_path: str = f'tfl_cropped_image_{row[SEQ_IMAG]}_cord_{int(row[X]), int(row[Y])}.png'
         # converts the crop to an image and saves it in the 'data' folder
         # create the png file
         # print(np.max(crop))
@@ -138,7 +137,8 @@ def create_crops(df: DataFrame) -> DataFrame:
         crop_image.save(CROP_DIR / crop_path)
 
         result_template[CROP_PATH] = crop_path
-        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop, x0, x1, y0, y1,row[IMAG_PATH],ignore=ignore)
+        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop, x0, x1, y0, y1, row[IMAG_PATH],
+                                                                      ignore=ignore)
         # ******* TO HERE *******
 
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
