@@ -38,10 +38,10 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
         c_image = run_attention.resize_image(copy_image, zoom_rate)
 
     # find coordinates of the crop to create a rectangle around the traffic light
-    x0 = x - 12
-    x1 = x + 12
-    y0 = y - 50 if color == 'g' else y - 10
-    y1 = y + 10 if color == 'g' else y + 50
+    x0 = x - 15
+    x1 = x + 15
+    y0 = y - 55 if color == 'g' else y - 14
+    y1 = y + 14 if color == 'g' else y + 55
     # check if the coordinates are out of the image
     if x0 < 0:
         x1 = x1 - x0
@@ -61,7 +61,7 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     return x, x, y, y, crop, ignore
 
 
-def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignor: bool) -> bool:
+def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignore: bool) -> (bool, bool):
     """
     Check if a given crop region intersects with any "traffic light" polygons in a JSON annotation file.
 
@@ -76,8 +76,6 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignor: bool)
     bool: True if the crop region intersects with any "traffic light" polygon, False otherwise.
     """
     deviation = 5
-    if ignor:
-        return False
     json_path = image_path.replace("_leftImg8bit.png", "_gtFine_polygons.json")
 
     # Load the JSON data from the file
@@ -92,8 +90,8 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignor: bool)
                 min_x, max_x = min(x_values), max(x_values)
                 min_y, max_y = min(y_values), max(y_values)
                 if x0 - deviation < min_x and x1 + deviation > max_x and y0 - deviation < min_y and y1 + deviation > max_y:
-                    return True
-    return False
+                    return True, ignore
+    return False, ignore
 
 
 def create_crops(df: DataFrame) -> DataFrame:
@@ -117,30 +115,20 @@ def create_crops(df: DataFrame) -> DataFrame:
     result_template: Dict[Any] = {SEQ: '', IS_TRUE: '', IGNOR: '', CROP_PATH: '', X0: '', X1: '', Y0: '', Y1: '',
                                   COL: ''}
     for index, row in df.iterrows():
-        # ---------------------------------------------------------------------------
-        print(f'creating crop number {index} from image {row[SEQ_IMAG]}')
-        # ---------------------------------------------------------------------------
-
         result_template[SEQ] = row[SEQ_IMAG]
         result_template[COL] = row[COLOR]
-
-        # example code:
-        # ******* rewrite ONLY FROM HERE *******
         x0, x1, y0, y1, crop, ignore = make_crop(row)
         result_template[X0], result_template[X1], result_template[Y0], result_template[Y1] = x0, x1, y0, y1
         crop_path: str = f'tfl_cropped_image_{row[SEQ_IMAG]}_cord_{int(row[X]), int(row[Y])}.png'
         # converts the crop to an image and saves it in the 'data' folder
         # create the png file
-        # print(np.max(crop))
         crop = crop.astype(np.uint8)
         crop_image = Image.fromarray(crop)
         crop_image.save(CROP_DIR / crop_path)
 
         result_template[CROP_PATH] = crop_path
-        result_template[IS_TRUE], result_template[IGNOR] = check_crop(crop, x0, x1, y0, y1, row[IMAG_PATH],
+        result_template[IS_TRUE], result_template[IGNOR] = check_crop( x0, x1, y0, y1, row[IMAG_PATH],
                                                                       ignore=ignore)
-        # ******* TO HERE *******
-
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
         result_df = result_df._append(result_template, ignore_index=True)
     return result_df
