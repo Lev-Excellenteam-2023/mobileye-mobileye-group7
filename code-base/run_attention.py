@@ -27,8 +27,8 @@ from scipy.ndimage import maximum_filter
 from PIL import Image
 import matplotlib.pyplot as plt
 
-RED_THRESHOLD = 42
-GREEN_THRESHOLD = 42
+RED_THRESHOLD = 80
+GREEN_THRESHOLD = 80
 
 
 def convolve_rgb_image( image:np.ndarray, kernel, mode='same' ) -> \
@@ -53,6 +53,7 @@ def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np
     :param kernel: a 2D array.
     :return: The convolved image.
     """
+
     return sg.correlate2d(image_channel, kernel, mode=mode, boundary='symm')
 def circle_kernael(size: int, radius: int, shift: int):
     """
@@ -103,10 +104,10 @@ def find_light_point(original_image, filtered_image, threshold_value, color)->(L
     for i in range(filtered_image.shape[0]):
         for j in range(filtered_image.shape[1]):
             if max_filtered_image[i, j] == filtered_image[i, j] and filtered_image[i, j] > threshold_value:
-                # if checkColor(j, i, original_image) == color:
-                peaks_y.append(i)
-                peaks_x.append(j)
-                # else:
+                if checkColor(j, i, original_image) == color:
+                    peaks_y.append(i)
+                    peaks_x.append(j)
+                    # else:
                 #     print(f"not the right color: {color} in {j},{i}")
     return peaks_x, peaks_y
 
@@ -123,10 +124,14 @@ def resize_image ( c_image: np.ndarray, ratio: float ) -> np.ndarray:
     new_height = int(height * ratio)
     new_width = int(width * ratio)
 
+    # Calculate the actual ratio applied to the dimensions
+    actual_ratio_height = new_height / height
+    actual_ratio_width = new_width / width
+
     resized_image = np.zeros((new_height, new_width, channels), dtype=c_image.dtype)
 
     for c in range(channels):
-        resized_image[:, :, c] = ndimage.zoom(c_image[:, :, c], ratio)
+        resized_image[:, :, c] = ndimage.zoom(c_image[:, :, c], (actual_ratio_height, actual_ratio_width))
 
     return resized_image
 
@@ -140,10 +145,9 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     :return: Dictionary with at least the following keys: 'x', 'y', 'col', each containing a list (same lengths).
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
-    zoom_ratio = 0.5
-    zoom_iter = 1
-    kernel = np.load(r'../kernels/kernel_7.npy')
-    print(np.sum(kernel))
+    zoom_ratio = [0.85,0.5,0.3 ]
+    kernel = circle_kernael(20, 5, 5)
+
     # plt.imshow(kernel)
     # plt.show()
 
@@ -161,23 +165,26 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
 
 
     zoom = [1]*( len(red_peaks_x)+ len(green_peaks_x))
-    while zoom_iter > 0:
-        c_image = resize_image(c_image, ratio=zoom_ratio)
+    for i in range(len(zoom_ratio)):
+        resized_image = resize_image(c_image, ratio=zoom_ratio[i])
         red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, green_convolved_new, red_convolved_new \
-            = convolve_rgb_image(c_image, kernel)
+            = convolve_rgb_image(resized_image, kernel)
         # rescale the coordinates to the original image scale
-        red_peaks_x_new = [int(x / zoom_ratio) for x in red_peaks_x_new]
-        red_peaks_y_new = [int(y / zoom_ratio) for y in red_peaks_y_new]
-        green_peaks_x_new = [int(x / zoom_ratio) for x in green_peaks_x_new]
-        green_peaks_y_new = [int(y / zoom_ratio) for y in green_peaks_y_new]
-        print(f"zoom_iter: {zoom_iter} , len(red_peaks_x_new): {len(red_peaks_x_new)} , len(green_peaks_x_new): {len(green_peaks_x_new)}")
+        if i ==1:
+            print()
+        red_peaks_x_new = [int(x / zoom_ratio[i]) for x in red_peaks_x_new]
+        red_peaks_y_new = [int(y / zoom_ratio[i]) for y in red_peaks_y_new]
+        green_peaks_x_new = [int(x / zoom_ratio[i]) for x in green_peaks_x_new]
+        green_peaks_y_new = [int(y / zoom_ratio[i]) for y in green_peaks_y_new]
         red_peaks_x += red_peaks_x_new
         red_peaks_y += red_peaks_y_new
         green_peaks_x += green_peaks_x_new
         green_peaks_y += green_peaks_y_new
         # green_convolved = green_convolved_new
+        # red_convolved = red_convolved_new
         zoom += [zoom_ratio]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
-        zoom_iter -= 1
+        print(f"zoom ratio: {zoom_ratio[i]} , zoom iter: {i} ,red_peaks_x: {len(red_peaks_x_new)} ,green_peaks_x:"
+              f" {len(green_peaks_x_new)}")
 
     # plt.imshow(c_image)
     # plt.show()
@@ -186,7 +193,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
-            'conv_im': green_convolved,'zoom':zoom}
+            'conv_im': red_convolved,'zoom':zoom}
 
 
 
