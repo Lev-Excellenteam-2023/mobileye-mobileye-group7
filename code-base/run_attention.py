@@ -30,6 +30,7 @@ import matplotlib.pyplot as plt
 RED_THRESHOLD = 80
 GREEN_THRESHOLD = 80
 
+COUNTER=[0,0,0]
 
 def convolve_rgb_image( image:np.ndarray, kernel, mode='same' ) -> \
         (List[int], List[int], List[int], List[int], np.ndarray, np.ndarray):
@@ -81,8 +82,6 @@ def circle_kernael(size: int, radius: int, shift: int):
     kernel = kernel - np.mean(kernel)
     # center of the kernel will be 1.
     kernel = kernel / np.max(kernel)
-    # plt.imshow(kernel, cmap='gray')
-    # plt.show()
     kernel = kernel.astype(np.float32)
     return kernel
 
@@ -148,11 +147,8 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     zoom_ratio = [0.85,0.5,0.3 ]
     kernel = circle_kernael(20, 5, 5)
 
-    # plt.imshow(kernel)
-    # plt.show()
-
     # remove from the image the bottom part (40 percent)
-    c_image = c_image[:int(c_image.shape[0] * 0.6), :, :]
+    c_image = c_image[:int(c_image.shape[0] * 0.55), :, :]
     red_peaks_x: list[int]
     red_peaks_y: list[int]
     green_peaks_x: list[int]
@@ -170,8 +166,6 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
         red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, green_convolved_new, red_convolved_new \
             = convolve_rgb_image(resized_image, kernel)
         # rescale the coordinates to the original image scale
-        if i ==1:
-            print()
         red_peaks_x_new = [int(x / zoom_ratio[i]) for x in red_peaks_x_new]
         red_peaks_y_new = [int(y / zoom_ratio[i]) for y in red_peaks_y_new]
         green_peaks_x_new = [int(x / zoom_ratio[i]) for x in green_peaks_x_new]
@@ -180,16 +174,8 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
         red_peaks_y += red_peaks_y_new
         green_peaks_x += green_peaks_x_new
         green_peaks_y += green_peaks_y_new
-        # green_convolved = green_convolved_new
-        # red_convolved = red_convolved_new
-        zoom += [zoom_ratio]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
-        print(f"zoom ratio: {zoom_ratio[i]} , zoom iter: {i} ,red_peaks_x: {len(red_peaks_x_new)} ,green_peaks_x:"
-              f" {len(green_peaks_x_new)}")
-
-    # plt.imshow(c_image)
-    # plt.show()
-
-
+        zoom += [zoom_ratio[i]]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
+        COUNTER[i] += len(red_peaks_x_new) + len(green_peaks_x_new)
     return {X: red_peaks_x + green_peaks_x,
             Y: red_peaks_y + green_peaks_y,
             COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
@@ -235,7 +221,6 @@ def checkColor(center_x: int, center_y: int, c_image: np.ndarray):
         elif check_coords.count('g') < check_coords.count('r'):
             return "r"
     print(f"checkColor: {check_coords} , center_x: {center_x} , center_y: {center_y}")
-    print("esedfghjk")
     return "b"
 
 def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
@@ -390,7 +375,9 @@ def main(argv=None):
     # save the DataFrames in the right format for stage two.
     save_df_for_part_2(crops_df, combined_df)
     print(f"Got a total of {len(combined_df)} results")
-
+    # ---------------------------------------------------------------------------
+    for i in range(len(COUNTER)):
+        print(f"zoom ratio iter {i} added points {COUNTER[i]}")
     if args.debug:
         plt.show(block=True)
 
