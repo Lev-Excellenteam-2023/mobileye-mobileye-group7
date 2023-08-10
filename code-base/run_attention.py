@@ -132,6 +132,25 @@ def resize_image ( c_image: np.ndarray, ratio: float ) -> np.ndarray:
     return resized_image
 
 
+def filter_close_peaks(peaks_x: List[int], peaks_y: List[int], color_list: List[str], zoom: List[float]) -> \
+        (List[int], List[int], List[str], List[float]):
+    """
+    Filter peaks that are too close to each other
+    :param peaks_x: list of x coordinates of peaks
+    :param peaks_y: list of y coordinates of peaks
+    :param color_list: list of colors of peaks
+    :param zoom: list of zoom ratios
+    :return: filtered peaks
+    """
+    filtered_peaks = []
+    for x, y, color, z in zip(peaks_x, peaks_y, color_list, zoom):
+        conflicting_indices = [i for i, (fx, fy, _, _) in enumerate(filtered_peaks)
+                               if abs(x - fx) < 5 and abs(y - fy) < 5]
+        if conflicting_indices:
+            filtered_peaks = [p for i, p in enumerate(filtered_peaks) if i not in conflicting_indices]
+        filtered_peaks.append((x, y, color, z))
+
+    return zip(*filtered_peaks) if filtered_peaks else ([], [], [], [])
 def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     """
     Detect candidates for TFL lights. Use c_image, kwargs and you imagination to implement.
@@ -151,6 +170,9 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     red_peaks_y: list[int]
     green_peaks_x: list[int]
     green_peaks_y: list[int]
+    color_list: list[str] =[]
+    peaks_x: list[int] = []
+    peaks_y: list[int] = []
     green_convolved: np.ndarray
     red_convolved: np.ndarray
     red_peaks_x, red_peaks_y ,green_peaks_x, green_peaks_y, green_convolved,red_convolved\
@@ -159,7 +181,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     # rescale the coordinates to the original image scale (before removing the top and bottom parts)
 
 
-    zoom = [1]*( len(red_peaks_x)+ len(green_peaks_x))
+    zoom:List[float] = [1]*( len(red_peaks_x)+ len(green_peaks_x))
     for i in range(len(zoom_ratio)):
         resized_image = resize_image(c_image, ratio=zoom_ratio[i])
         red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, green_convolved_new, red_convolved_new \
@@ -175,11 +197,16 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
         red_peaks_y += red_peaks_y_new
         green_peaks_x += green_peaks_x_new
         green_peaks_y += green_peaks_y_new
-        zoom += [zoom_ratio[i]]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
         COUNTER[i] += len(red_peaks_x_new) + len(green_peaks_x_new)
-    return {X: red_peaks_x + green_peaks_x,
-            Y: red_peaks_y + green_peaks_y,
-            COLOR: [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x),
+
+        zoom += [zoom_ratio[i]]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
+    color_list =[RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x)
+    peaks_x = red_peaks_x + green_peaks_x
+    peaks_y = red_peaks_y + green_peaks_y
+    peaks_x, peaks_y, color_list, zoom = filter_close_peaks(peaks_x, peaks_y, color_list, zoom)
+    return {X: peaks_x,
+            Y: peaks_y,
+            COLOR: color_list,
             'conv_im': red_convolved,'zoom':zoom}
 
 def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image):
@@ -346,8 +373,14 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
         row_template[COL] = row[COLOR]
         attention_df = attention_df._append(row_template, ignore_index=True)
     attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, index=False)
-    crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
-
+    if (ATTENTION_PATH / CROP_CSV_NAME).exists():
+        existing_crops = pd.read_csv(ATTENTION_PATH / CROP_CSV_NAME)
+        updated_crops = pd.concat([existing_crops, crops_sorted], ignore_index=True)
+        # sort by sequence, so we can compare to the attention results
+        updated_crops = updated_crops.sort_values(by=SEQ)
+        updated_crops.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
+    else:
+        crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
 
 def parse_arguments(argv: Optional[Sequence[str]]):
     """
