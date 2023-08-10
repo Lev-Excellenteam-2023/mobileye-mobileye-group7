@@ -38,10 +38,10 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
         c_image = run_attention.resize_image(copy_image, zoom_rate)
 
     # find coordinates of the crop to create a rectangle around the traffic light
-    x0 = x - 15
-    x1 = x + 15
-    y0 = y - 55 if color == 'g' else y - 14
-    y1 = y + 14 if color == 'g' else y + 55
+    x0 = x - 16
+    x1 = x + 16
+    y0 = y - 76 if color == 'g' else y - 20
+    y1 = y + 20 if color == 'g' else y + 76
     # check if the coordinates are out of the image
     if x0 < 0:
         x1 = x1 - x0

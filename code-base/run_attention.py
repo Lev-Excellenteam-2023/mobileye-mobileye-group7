@@ -371,17 +371,20 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
         row_template[RELEVANT_IMAGE_PATH] = row[IMAG_PATH]
         row_template[X], row_template[Y] = row[X], row[Y]
         row_template[COL] = row[COLOR]
+        row_template[ZOOM] = row[ZOOM]
         attention_df = attention_df._append(row_template, ignore_index=True)
-    attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, index=False)
+    if (ATTENTION_PATH / ATTENTION_CSV_NAME).exists():
+        attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, mode='a', header=False, index=False)
+    else:
+        attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, index=False)
+
+        # Write crops_sorted to CROP_CSV_NAME without erasing existing data.
     if (ATTENTION_PATH / CROP_CSV_NAME).exists():
         existing_crops = pd.read_csv(ATTENTION_PATH / CROP_CSV_NAME)
         updated_crops = pd.concat([existing_crops, crops_sorted], ignore_index=True)
-        # sort by sequence, so we can compare to the attention results
-        updated_crops = updated_crops.sort_values(by=SEQ)
         updated_crops.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
     else:
         crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
-
 def parse_arguments(argv: Optional[Sequence[str]]):
     """
     Here are all the arguments in the attention stage.
