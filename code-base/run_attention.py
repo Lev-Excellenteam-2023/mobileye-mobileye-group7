@@ -30,9 +30,10 @@ import matplotlib.pyplot as plt
 RED_THRESHOLD = 80
 GREEN_THRESHOLD = 80
 
-COUNTER=[0,0,0]
+COUNTER = [0, 0, 0]
 
-def convolve_rgb_image( image:np.ndarray, kernel, mode='same' ) -> \
+
+def convolve_rgb_image(image: np.ndarray, kernel, mode='same') -> \
         (List[int], List[int], List[int], List[int], np.ndarray, np.ndarray):
     """
     Convolve a 2D image with a given kernel.
@@ -41,13 +42,14 @@ def convolve_rgb_image( image:np.ndarray, kernel, mode='same' ) -> \
     :return: The convolved image.
     """
 
-    red = convolve_2d_with_kernel(image[:,:,0], kernel, mode=mode)
-    green = convolve_2d_with_kernel(image[:,:,1], kernel, mode=mode)
-    red_peaks_x, red_peaks_y = find_light_point( red, RED_THRESHOLD, )
+    red = convolve_2d_with_kernel(image[:, :, 0], kernel, mode=mode)
+    green = convolve_2d_with_kernel(image[:, :, 1], kernel, mode=mode)
+    red_peaks_x, red_peaks_y = find_light_point(red, RED_THRESHOLD, )
     green_peaks_x, green_peaks_y = find_light_point(green, GREEN_THRESHOLD, )
-    return red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y , red, green
+    return red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, red, green
 
-def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np.ndarray:
+
+def convolve_2d_with_kernel(image_channel: np.ndarray, kernel, mode='same') -> np.ndarray:
     """
     Convolve a 2D image with a given kernel.
     :param image: a 2D array.
@@ -56,6 +58,8 @@ def convolve_2d_with_kernel(image_channel:np.ndarray, kernel, mode='same') -> np
     """
 
     return sg.correlate2d(image_channel, kernel, mode=mode, boundary='symm')
+
+
 def circle_kernael(size: int, radius: int, shift: int):
     """
     Creates a circle kernel.
@@ -86,7 +90,7 @@ def circle_kernael(size: int, radius: int, shift: int):
     return kernel
 
 
-def find_light_point( filtered_image, threshold_value)->(List[int],List[int]):
+def find_light_point(filtered_image, threshold_value) -> (List[int], List[int]):
     """
     get- original_image- array of the original image
         filtered_image- array of image after convolving by red/green kernel
@@ -103,12 +107,12 @@ def find_light_point( filtered_image, threshold_value)->(List[int],List[int]):
     for i in range(filtered_image.shape[0]):
         for j in range(filtered_image.shape[1]):
             if max_filtered_image[i, j] == filtered_image[i, j] and filtered_image[i, j] > threshold_value:
-                    peaks_y.append(i)
-                    peaks_x.append(j)
+                peaks_y.append(i)
+                peaks_x.append(j)
     return peaks_x, peaks_y
 
 
-def resize_image ( c_image: np.ndarray, ratio: float ) -> np.ndarray:
+def resize_image(c_image: np.ndarray, ratio: float) -> np.ndarray:
     """
     Resize the image by a given ratio while preserving the third dimension.
 
@@ -151,6 +155,8 @@ def filter_close_peaks(peaks_x: List[int], peaks_y: List[int], color_list: List[
         filtered_peaks.append((x, y, color, z))
 
     return zip(*filtered_peaks) if filtered_peaks else ([], [], [], [])
+
+
 def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     """
     Detect candidates for TFL lights. Use c_image, kwargs and you imagination to implement.
@@ -161,7 +167,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
     """
     original_image = c_image
-    zoom_ratio = [0.85,0.5,0.3 ]
+    zoom_ratio = [0.85, 0.5, 0.3]
     kernel = circle_kernael(20, 5, 5)
 
     # remove from the image the bottom part (40 percent)
@@ -170,18 +176,17 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
     red_peaks_y: list[int]
     green_peaks_x: list[int]
     green_peaks_y: list[int]
-    color_list: list[str] =[]
+    color_list: list[str] = []
     peaks_x: list[int] = []
     peaks_y: list[int] = []
     green_convolved: np.ndarray
     red_convolved: np.ndarray
-    red_peaks_x, red_peaks_y ,green_peaks_x, green_peaks_y, green_convolved,red_convolved\
+    red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, green_convolved, red_convolved \
         = convolve_rgb_image(c_image, kernel)
     filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, original_image)
     # rescale the coordinates to the original image scale (before removing the top and bottom parts)
 
-
-    zoom:List[float] = [1]*( len(red_peaks_x)+ len(green_peaks_x))
+    zoom: List[float] = [1] * (len(red_peaks_x) + len(green_peaks_x))
     for i in range(len(zoom_ratio)):
         resized_image = resize_image(c_image, ratio=zoom_ratio[i])
         red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, green_convolved_new, red_convolved_new \
@@ -199,15 +204,16 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
         green_peaks_y += green_peaks_y_new
         COUNTER[i] += len(red_peaks_x_new) + len(green_peaks_x_new)
 
-        zoom += [zoom_ratio[i]]*(len(red_peaks_x_new)+ len(green_peaks_x_new))
-    color_list =[RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x)
+        zoom += [zoom_ratio[i]] * (len(red_peaks_x_new) + len(green_peaks_x_new))
+    color_list = [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x)
     peaks_x = red_peaks_x + green_peaks_x
     peaks_y = red_peaks_y + green_peaks_y
     peaks_x, peaks_y, color_list, zoom = filter_close_peaks(peaks_x, peaks_y, color_list, zoom)
     return {X: peaks_x,
             Y: peaks_y,
             COLOR: color_list,
-            'conv_im': red_convolved,'zoom':zoom}
+            'conv_im': red_convolved, 'zoom': zoom}
+
 
 def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image):
     """
@@ -228,7 +234,6 @@ def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image
         if check_color(x, y, c_image) != 'g' or y < 10:
             green_peaks_x.remove(x)
             green_peaks_y.remove(y)
-
 
 
 def check_color(center_x: int, center_y: int, c_image: np.ndarray):
@@ -260,7 +265,7 @@ def check_color(center_x: int, center_y: int, c_image: np.ndarray):
                 green_value = c_image[point_y, point_x, 1]
 
                 # Check if the green value is significantly larger than red
-                if green_value > red_value*threshold_ratio:
+                if green_value > red_value * threshold_ratio:
                     check_coords.append('g')  # Green is significantly larger than red within the circle
                 elif green_value < red_value:
                     check_coords.append('r')
@@ -270,6 +275,7 @@ def check_color(center_x: int, center_y: int, c_image: np.ndarray):
             return "r"
     print(f"checkColor: {check_coords} , center_x: {center_x} , center_y: {center_y}")
     return "b"
+
 
 def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
     """
@@ -289,7 +295,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         ax = None
     # In case you want, you can pass any parameter to find_tfl_lights, because it uses **kwargs
     attention_dict: Dict[str, Any] = find_tfl_lights(image)
-    convolved_image =attention_dict.pop('conv_im')
+    convolved_image = attention_dict.pop('conv_im')
     attention: DataFrame = pd.DataFrame(attention_dict)
     # Copy all image metadata from the row into the results, so we can track it later
     for k, v in row.items():
@@ -318,6 +324,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         plt.title('Some useless image for you')
         plt.suptitle("When you zoom on one, the other zooms too :-)")
     return attention
+
 
 def prepare_list(in_csv_file: Path, args: Namespace) -> DataFrame:
     """
@@ -385,6 +392,8 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
         updated_crops.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
     else:
         crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
+
+
 def parse_arguments(argv: Optional[Sequence[str]]):
     """
     Here are all the arguments in the attention stage.
@@ -435,6 +444,7 @@ def main(argv=None):
     # ---------------------------------------------------------------------------
     for i in range(len(COUNTER)):
         print(f"zoom ratio iter {i} added points {COUNTER[i]}")
+    # ---------------------------------------------------------------------------
     if args.debug:
         plt.show(block=True)
 
