@@ -381,7 +381,14 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
         row_template[ZOOM] = row[ZOOM]
         attention_df = attention_df._append(row_template, ignore_index=True)
     if (ATTENTION_PATH / ATTENTION_CSV_NAME).exists():
-        attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, mode='a', header=False, index=False)
+        # read existing attention csv
+        existing_attention = pd.read_csv(ATTENTION_PATH / ATTENTION_CSV_NAME)
+        # concat existing attention with new attention.
+        updated_attention = pd.concat([existing_attention, attention_df], ignore_index=True)
+        # filter out duplicates by path and x,y coordinates.
+        updated_attention = updated_attention.drop_duplicates(subset=[RELEVANT_IMAGE_PATH, X, Y])
+        # write updated attention to csv.
+        updated_attention.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, index=False)
     else:
         attention_df.to_csv(ATTENTION_PATH / ATTENTION_CSV_NAME, index=False)
 
@@ -389,7 +396,9 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
     if (ATTENTION_PATH / CROP_CSV_NAME).exists():
         existing_crops = pd.read_csv(ATTENTION_PATH / CROP_CSV_NAME)
         updated_crops = pd.concat([existing_crops, crops_sorted], ignore_index=True)
+        updated_crops = updated_crops.drop_duplicates(subset=[RELEVANT_IMAGE_PATH])
         updated_crops.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
+
     else:
         crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
 

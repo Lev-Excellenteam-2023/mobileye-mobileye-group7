@@ -58,10 +58,10 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     # create the crop
     crop = c_image[int(y0):int(y1), int(x0):int(x1)]
     # adjust the corners to the original image
-    x0 = x0 / zoom_rate
-    x1 = x1 / zoom_rate
-    y0 = y0 / zoom_rate
-    y1 = y1 / zoom_rate
+    x0 = int(x0 / zoom_rate)
+    x1 = int(x1 / zoom_rate)
+    y0 = int(y0 / zoom_rate)
+    y1 = int(y1 / zoom_rate)
 
     return x0, x1, y0, y1, crop, ignore
 
