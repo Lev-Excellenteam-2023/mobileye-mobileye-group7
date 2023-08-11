@@ -33,7 +33,7 @@ GREEN_THRESHOLD = 80
 COUNTER = [0, 0, 0]
 
 
-def convolve_rgb_image(image: np.ndarray, kernel, mode='same') -> \
+def convolve_rgb_image ( image: np.ndarray, kernel, mode='same' ) -> \
         (List[int], List[int], List[int], List[int], np.ndarray, np.ndarray):
     """
     Convolve a 2D image with a given kernel.
@@ -49,7 +49,7 @@ def convolve_rgb_image(image: np.ndarray, kernel, mode='same') -> \
     return red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, red, green
 
 
-def convolve_2d_with_kernel(image_channel: np.ndarray, kernel, mode='same') -> np.ndarray:
+def convolve_2d_with_kernel ( image_channel: np.ndarray, kernel, mode='same' ) -> np.ndarray:
     """
     Convolve a 2D image with a given kernel.
     :param image: a 2D array.
@@ -60,7 +60,7 @@ def convolve_2d_with_kernel(image_channel: np.ndarray, kernel, mode='same') -> n
     return sg.correlate2d(image_channel, kernel, mode=mode, boundary='symm')
 
 
-def circle_kernael(size: int, radius: int, shift: int):
+def circle_kernel( size: int, radius: int, shift: int ):
     """
     Creates a circle kernel.
     :param size: The size of the kernel.
@@ -90,7 +90,7 @@ def circle_kernael(size: int, radius: int, shift: int):
     return kernel
 
 
-def find_light_point(filtered_image, threshold_value) -> (List[int], List[int]):
+def find_light_point ( filtered_image, threshold_value ) -> (List[int], List[int]):
     """
     get- original_image- array of the original image
         filtered_image- array of image after convolving by red/green kernel
@@ -112,7 +112,7 @@ def find_light_point(filtered_image, threshold_value) -> (List[int], List[int]):
     return peaks_x, peaks_y
 
 
-def resize_image(c_image: np.ndarray, ratio: float) -> np.ndarray:
+def resize_image ( c_image: np.ndarray, ratio: float ) -> np.ndarray:
     """
     Resize the image by a given ratio while preserving the third dimension.
 
@@ -136,7 +136,7 @@ def resize_image(c_image: np.ndarray, ratio: float) -> np.ndarray:
     return resized_image
 
 
-def filter_close_peaks(peaks_x: List[int], peaks_y: List[int], color_list: List[str], zoom: List[float]) -> \
+def filter_close_peaks ( peaks_x: List[int], peaks_y: List[int], color_list: List[str], zoom: List[float] ) -> \
         (List[int], List[int], List[str], List[float]):
     """
     Filter peaks that are too close to each other
@@ -157,65 +157,83 @@ def filter_close_peaks(peaks_x: List[int], peaks_y: List[int], color_list: List[
     return zip(*filtered_peaks) if filtered_peaks else ([], [], [], [])
 
 
-def find_tfl_lights(c_image: np.ndarray, **kwargs) -> Dict[str, Any]:
+def find_tfl_lights ( c_image: np.ndarray, **kwargs ) -> Dict[str, Any]:
     """
-    Detect candidates for TFL lights. Use c_image, kwargs and you imagination to implement.
+    Detect candidates for TFL lights.
 
-    :param c_image: a H*W*3 RGB image of dtype np.uint8 (RGB, 0-255).
+    :param c_image: A H*W*3 RGB image of dtype np.uint8 (RGB, 0-255).
     :param kwargs: Whatever you want.
-    :return: Dictionary with at least the following keys: 'x', 'y', 'col', each containing a list (same lengths).
-    # Note there are no explicit strings in the code-base. ALWAYS USE A CONSTANT VARIABLE INSTEAD!.
+    :return: Dictionary with 'x', 'y', 'col', 'conv_im', and 'zoom' keys.
     """
+
+    def preprocess_image ( image ):
+        """
+        Preprocess the image by removing the bottom part.
+        """
+        return image[:int(image.shape[0] * BOTTOM_PERCENT), :, :]
+
+    def resize_and_convolve ( image, zoom_ratio,kernel ):
+        """
+        Resize the image and convolve it with a circle kernel.
+        """
+        resized = resize_image(image, ratio=zoom_ratio) if zoom_ratio != 1 else image
+        return convolve_rgb_image(resized, kernel)
+
+    def apply_zoom ( peaks, zoom_ratio ):
+        """
+        Apply the zoom ratio to the peaks.
+        """
+        return [int(x / zoom_ratio) for x in peaks]
+    # Constants
+    ZOOM_RATIOS = [1, 0.85, 0.5, 0.3]
+    KERNEL_SIZE = 20
+    FILTER_RADIUS = 5
+    BOTTOM_PERCENT = 0.55
+
+    # Initializations
     original_image = c_image
-    zoom_ratio = [0.85, 0.5, 0.3]
-    kernel = circle_kernael(20, 5, 5)
+    # remove the bottom part of the image
+    c_image = preprocess_image(c_image)
+    kernel = circle_kernel(KERNEL_SIZE, FILTER_RADIUS, FILTER_RADIUS)
+    filtered_peaks_x, filtered_peaks_y = [], []
+    color_list, zoom_list = [], []
+    red_convolved = np.ndarray([])
+    green_convolved = None
 
-    # remove from the image the bottom part (40 percent)
-    c_image = c_image[:int(c_image.shape[0] * 0.55), :, :]
-    red_peaks_x: list[int]
-    red_peaks_y: list[int]
-    green_peaks_x: list[int]
-    green_peaks_y: list[int]
-    color_list: list[str] = []
-    peaks_x: list[int] = []
-    peaks_y: list[int] = []
-    green_convolved: np.ndarray
-    red_convolved: np.ndarray
-    red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, green_convolved, red_convolved \
-        = convolve_rgb_image(c_image, kernel)
-    filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, original_image)
-    # rescale the coordinates to the original image scale (before removing the top and bottom parts)
+    for zoom_ratio in ZOOM_RATIOS:
+        red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, green_convolved_new, red_convolved_new \
+            = resize_and_convolve(c_image, zoom_ratio, kernel)
 
-    zoom: List[float] = [1] * (len(red_peaks_x) + len(green_peaks_x))
-    for i in range(len(zoom_ratio)):
-        resized_image = resize_image(c_image, ratio=zoom_ratio[i])
-        red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, green_convolved_new, red_convolved_new \
-            = convolve_rgb_image(resized_image, kernel)
-        # rescale the coordinates to the original image scale
-        red_peaks_x_new = [int(x / zoom_ratio[i]) for x in red_peaks_x_new]
-        red_peaks_y_new = [int(y / zoom_ratio[i]) for y in red_peaks_y_new]
-        green_peaks_x_new = [int(x / zoom_ratio[i]) for x in green_peaks_x_new]
-        green_peaks_y_new = [int(y / zoom_ratio[i]) for y in green_peaks_y_new]
-        filter_peaks(red_peaks_x_new, red_peaks_y_new, green_peaks_x_new, green_peaks_y_new, original_image)
+        if zoom_ratio == 1:
+            # keep the convolved images for showing them later.
+            green_convolved = green_convolved_new
+            red_convolved = red_convolved_new
+        else:
+            # convert the peaks to the original image coordinates.
+            red_peaks_x = apply_zoom(red_peaks_x, zoom_ratio)
+            red_peaks_y = apply_zoom(red_peaks_y, zoom_ratio)
+            green_peaks_x = apply_zoom(green_peaks_x, zoom_ratio)
+            green_peaks_y = apply_zoom(green_peaks_y, zoom_ratio)
 
-        red_peaks_x += red_peaks_x_new
-        red_peaks_y += red_peaks_y_new
-        green_peaks_x += green_peaks_x_new
-        green_peaks_y += green_peaks_y_new
-        COUNTER[i] += len(red_peaks_x_new) + len(green_peaks_x_new)
+        filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, original_image)
+        filtered_peaks_x += red_peaks_x + green_peaks_x
+        filtered_peaks_y += red_peaks_y + green_peaks_y
+        color_list += [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x)
+        zoom_list += [zoom_ratio] * (len(red_peaks_x) + len(green_peaks_x))
 
-        zoom += [zoom_ratio[i]] * (len(red_peaks_x_new) + len(green_peaks_x_new))
-    color_list = [RED] * len(red_peaks_x) + [GRN] * len(green_peaks_x)
-    peaks_x = red_peaks_x + green_peaks_x
-    peaks_y = red_peaks_y + green_peaks_y
-    peaks_x, peaks_y, color_list, zoom = filter_close_peaks(peaks_x, peaks_y, color_list, zoom)
-    return {X: peaks_x,
-            Y: peaks_y,
-            COLOR: color_list,
-            'conv_im': red_convolved, 'zoom': zoom}
+    peaks_x, peaks_y, color_list, zoom_list = filter_close_peaks(filtered_peaks_x, filtered_peaks_y, color_list,
+                                                                 zoom_list)
+
+    return {
+        X: peaks_x,
+        Y: peaks_y,
+        COLOR: color_list,
+        'conv_im': [red_convolved, green_convolved],
+        ZOOM: zoom_list
+    }
 
 
-def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image):
+def filter_peaks ( red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image ):
     """
     Filter the lists of red and green peaks based on their color using the checkColor function.
 
@@ -236,7 +254,7 @@ def filter_peaks(red_peaks_x, red_peaks_y, green_peaks_x, green_peaks_y, c_image
             green_peaks_y.remove(y)
 
 
-def check_color(center_x: int, center_y: int, c_image: np.ndarray):
+def check_color ( center_x: int, center_y: int, c_image: np.ndarray ):
     """
     Check if the green color is significantly larger than red within circles of increasing radius around the center point.
 
@@ -277,7 +295,7 @@ def check_color(center_x: int, center_y: int, c_image: np.ndarray):
     return "b"
 
 
-def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
+def test_find_tfl_lights ( row: Series, args: Namespace ) -> DataFrame:
     """
     Run the attention code-base
     """
@@ -295,7 +313,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
         ax = None
     # In case you want, you can pass any parameter to find_tfl_lights, because it uses **kwargs
     attention_dict: Dict[str, Any] = find_tfl_lights(image)
-    convolved_image = attention_dict.pop('conv_im')
+    convolved_image = attention_dict.pop('conv_im')[0]
     attention: DataFrame = pd.DataFrame(attention_dict)
     # Copy all image metadata from the row into the results, so we can track it later
     for k, v in row.items():
@@ -326,7 +344,7 @@ def test_find_tfl_lights(row: Series, args: Namespace) -> DataFrame:
     return attention
 
 
-def prepare_list(in_csv_file: Path, args: Namespace) -> DataFrame:
+def prepare_list( in_csv_file: Path, args: Namespace ) -> DataFrame:
     """
     We assume all students are working on the same CSV with files.
     This filters the list, so if you want to test some specific images, it's easy.
@@ -345,7 +363,7 @@ def prepare_list(in_csv_file: Path, args: Namespace) -> DataFrame:
     return pd.concat([pd.DataFrame(columns=CSV_INPUT), csv_list], ignore_index=True)
 
 
-def run_on_list(meta_table: pd.DataFrame, func: callable, args: Namespace) -> pd.DataFrame:
+def run_on_list ( meta_table: pd.DataFrame, func: callable, args: Namespace ) -> pd.DataFrame:
     """
     Take a function, and run it on a list. Return accumulated results.
 
@@ -366,7 +384,7 @@ def run_on_list(meta_table: pd.DataFrame, func: callable, args: Namespace) -> pd
     return all_results
 
 
-def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
+def save_df_for_part_2 ( crops_df: DataFrame, results_df: DataFrame ):
     if not ATTENTION_PATH.exists():
         ATTENTION_PATH.mkdir()
     # Order the df by sequence, a nice to have.
@@ -403,7 +421,7 @@ def save_df_for_part_2(crops_df: DataFrame, results_df: DataFrame):
         crops_sorted.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
 
 
-def parse_arguments(argv: Optional[Sequence[str]]):
+def parse_arguments ( argv: Optional[Sequence[str]] ):
     """
     Here are all the arguments in the attention stage.
     """
@@ -421,7 +439,7 @@ def parse_arguments(argv: Optional[Sequence[str]]):
     return args
 
 
-def main(argv=None):
+def main ( argv=None ):
     """
     It's nice to have a standalone tester for the algorithm.
     Consider looping over some images from here, so you can manually examine the results
