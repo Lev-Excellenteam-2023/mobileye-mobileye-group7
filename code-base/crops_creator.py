@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from consts import CROP_DIR, CROP_RESULT, SEQ, IS_TRUE, IGNOR, CROP_PATH, X0, X1, Y0, Y1, COLOR, SEQ_IMAG, COL, X, Y, \
-    GTIM_PATH, IMAG_PATH
+    GTIM_PATH, IMAG_PATH, JSON_PATH, ZOOM
 
 from pandas import DataFrame, Series
 
@@ -27,7 +27,7 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     # use this to ignore a crop if is on the edge of the image
     ignore = False
 
-    zoom_rate = row['zoom']
+    zoom_rate = row[ZOOM]
     imag_path = row[IMAG_PATH]
     c_image = np.array(Image.open(imag_path))
     copy_image = c_image.copy()
@@ -66,7 +66,7 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     return x0, x1, y0, y1, crop, ignore
 
 
-def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignore: bool) -> (bool, bool):
+def check_crop(*args, **kwargs) -> (bool, bool):
     """
     Check if a given crop region intersects with any "traffic light" polygons in a JSON annotation file.
 
@@ -80,8 +80,15 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignore: bool
     Returns:
     bool: True if the crop region intersects with any "traffic light" polygon, False otherwise.
     """
-    deviation = 5
-    json_path = image_path.replace("_leftImg8bit.png", "_gtFine_polygons.json")
+    x0 = args[0]
+    x1 = args[1]
+    y0 = args[2]
+    y1 = args[3]
+    ignore = kwargs['ignore']
+    json_path = kwargs['json_path']
+
+
+
 
     # Load the JSON data from the file
     with open(json_path) as json_file:
@@ -94,8 +101,15 @@ def check_crop(x0: int, x1: int, y0: int, y1: int, image_path: str, ignore: bool
                 x_values, y_values = zip(*points)
                 min_x, max_x = min(x_values), max(x_values)
                 min_y, max_y = min(y_values), max(y_values)
-                if x0 - deviation <= min_x and x1 + deviation >= max_x and y0 - deviation <= min_y and y1 + deviation >= max_y:
+                # Calculate intersection area
+                intersection_area = max(0, min(x1, max_x) - max(x0, min_x)) * max(0, min(y1, max_y) - max(y0, min_y))
+                polygon_area = (max_x - min_x) * (max_y - min_y)
+
+                # Check if more than 50% of the polygon area is within the crop region
+                if intersection_area >= 0.5 * polygon_area:
                     return True, ignore
+                elif intersection_area > 0:
+                    ignore = True
     return False, ignore
 
 
@@ -132,7 +146,7 @@ def create_crops(df: DataFrame) -> DataFrame:
         crop_image.save(CROP_DIR / crop_path)
 
         result_template[CROP_PATH] = crop_path
-        result_template[IS_TRUE], result_template[IGNOR] = check_crop(x0, x1, y0, y1, row[IMAG_PATH],
+        result_template[IS_TRUE], result_template[IGNOR] = check_crop(x0, x1, y0, y1,json_path=row[JSON_PATH],
                                                                       ignore=ignore)
         # added to current row to the result DataFrame that will serve you as the input to part 2 B).
         result_df = result_df._append(result_template, ignore_index=True)
