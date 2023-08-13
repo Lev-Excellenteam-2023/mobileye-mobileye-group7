@@ -402,7 +402,7 @@ def save_df_for_part_2 ( crops_df: DataFrame, results_df: DataFrame ):
         # read existing attention csv
         existing_attention = pd.read_csv(ATTENTION_PATH / ATTENTION_CSV_NAME)
         # concat existing attention with new attention.
-        updated_attention = pd.concat([existing_attention, attention_df], ignore_index=True)
+        updated_attention = pd.concat([attention_df,existing_attention], ignore_index=True)
         # filter out duplicates by path and x,y coordinates.
         updated_attention = updated_attention.drop_duplicates(subset=[RELEVANT_IMAGE_PATH, X, Y])
         # write updated attention to csv.
@@ -413,7 +413,7 @@ def save_df_for_part_2 ( crops_df: DataFrame, results_df: DataFrame ):
         # Write crops_sorted to CROP_CSV_NAME without erasing existing data.
     if (ATTENTION_PATH / CROP_CSV_NAME).exists():
         existing_crops = pd.read_csv(ATTENTION_PATH / CROP_CSV_NAME)
-        updated_crops = pd.concat([existing_crops, crops_sorted], ignore_index=True)
+        updated_crops = pd.concat([crops_sorted, existing_crops], ignore_index=True)
         updated_crops = updated_crops.drop_duplicates(subset=[RELEVANT_IMAGE_PATH])
         updated_crops.to_csv(ATTENTION_PATH / CROP_CSV_NAME, index=False)
 

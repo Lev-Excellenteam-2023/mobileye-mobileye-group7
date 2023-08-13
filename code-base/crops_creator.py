@@ -44,15 +44,19 @@ def make_crop(*args, **kwargs) -> (int, int, int, int, np.ndarray):
     y1 = y + 20 if color == 'g' else y + 76
     # check if the coordinates are out of the image
     if x0 < 0:
+        ignore = True
         x1 = x1 - x0
         x0 = 0
     if x1 > c_image.shape[1]:
+        ignore = True
         x0 = x0 - (x1 - c_image.shape[1])
         x1 = c_image.shape[1]
     if y0 < 0:
+        ignore = True
         y1 = y1 - y0
         y0 = 0
     if y1 > c_image.shape[0]:
+        ignore = True
         y0 = y0 - (y1 - c_image.shape[0])
         y1 = c_image.shape[0]
     # create the crop
