@@ -244,19 +244,20 @@ class TrafficLightDetectionNet(MyNeuralNetworkBase):
         image = np.array(Image.open(image_path))  # Torch.read_image ?
         return {self.IMAGE: image, self.LABEL: row[C.IS_TRUE], self.SEQ: row[self.SEQ], self.IMAGE_PATH: image_path}
 
+
     def set_net_and_loss(self):
         # Override this method to define your own network architecture and loss function
         self.layers = (
-            nn.Conv2d(self.num_in_channels, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.Conv2d(self.num_in_channels, 32, kernel_size=7, padding=3),
+            nn.BatchNorm2d(32, momentum=0.1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Flatten(),
-            nn.Linear(32 * (self.w // 4) * (self.h // 4), 128),
+            nn.Linear(32 * (self.w // 2) * (self.h // 2), 128),  # Adjust output size as needed
+            nn.Dropout(0.2),
             nn.ReLU(),
-            nn.Linear(128, 1),
+            nn.Linear(128, 1),  # Output a single score for detection
         )
         self.loss_func = nn.BCEWithLogitsLoss
         self.net = nn.Sequential(*self.layers)
+
