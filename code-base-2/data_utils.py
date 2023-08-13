@@ -169,7 +169,7 @@ class ModelManager:
         """
         # Define a model. Also need to do it when loading an existing model.
         if factory is None:
-            factory = MyNeuralNetworkBase
+            factory = TrafficLightDetectionNet
         model = factory(**kwargs).to(device)
         model.creation_kwargs = kwargs
         print(f"Model is:\n{model}\n")
@@ -229,3 +229,34 @@ class ModelManager:
         """
         # TODO: switch to pathLib
         return os.path.join(log_dir, f'model{suffix}.pkl')
+
+
+class TrafficLightDetectionNet(MyNeuralNetworkBase):
+    def __init__(self, **kwargs):
+        super(TrafficLightDetectionNet, self).__init__(**kwargs)
+
+    def __getitem__ ( self, idx ):
+        if torch.is_tensor(idx):
+            assert False, "What to do??"
+
+        row = self.crop_data.iloc[idx]
+        image_path = os.path.join(self.crop_dir, row[C.PATH])
+        image = np.array(Image.open(image_path))  # Torch.read_image ?
+        return {self.IMAGE: image, self.LABEL: row[C.IS_TRUE], self.SEQ: row[self.SEQ], self.IMAGE_PATH: image_path}
+
+    def set_net_and_loss(self):
+        # Override this method to define your own network architecture and loss function
+        self.layers = (
+            nn.Conv2d(self.num_in_channels, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Flatten(),
+            nn.Linear(32 * (self.w // 4) * (self.h // 4), 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+        )
+        self.loss_func = nn.BCEWithLogitsLoss
+        self.net = nn.Sequential(*self.layers)
