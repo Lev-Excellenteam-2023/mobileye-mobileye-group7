@@ -259,7 +259,7 @@ class GridPresenter:
         n_imgs = len(data[GridPresenter.IMAGE])
         self.last_page = n_imgs // (nrow * ncol)
         self.all_images = np.stack([v for v in self.data[GridPresenter.IMAGE]], axis=0) if n_imgs > 0 else np.array([])
-        self.mapping = np.zeros_like(self.all_images, dtype=np.int) + np.arange(len(self.all_images))[:, np.newaxis, np.newaxis, np.newaxis]
+        self.mapping = np.zeros_like(self.all_images, dtype=int) + np.arange(len(self.all_images))[:, np.newaxis, np.newaxis, np.newaxis]
         self.grid = None
         self.mapg = None
         self.callback = callback
