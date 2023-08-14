@@ -30,9 +30,10 @@ def run_one_train_epoch(model: MyNeuralNetworkBase, dataset: TrafficLightDataSet
     f_weight = 1. / num_tif[2]
     weights = torch.tensor(np.where(train_dataset.crop_data[C.IS_TRUE], t_weight, f_weight))
     sampler = WeightedRandomSampler(weights, len(weights)) if balance_samples else None
-    data_loader = DataLoader(train_dataset, batch_size=16, sampler=sampler)
+    data_loader = DataLoader(train_dataset, batch_size=4, sampler=sampler)
     loss_func = model.loss_func
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=0.001, amsgrad=False, betas=(0.9, 0.999),
+                           eps=1e-08)
     acc_loss = 0
     tot_samples = 0
     for i_batch, batch in enumerate(data_loader):

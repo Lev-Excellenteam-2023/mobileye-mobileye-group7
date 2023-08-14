@@ -67,6 +67,7 @@ class TrafficLightDataSet(Dataset):
         train_ratio = kwargs.get('train_ratio', 0.8)  # Amount of train data in the whole data
         with temp_seed(0):
             is_train = np.random.random(len(crop_data)) <= train_ratio
+        is_train = np.random.random(len(crop_data)) <= train_ratio
 
         ignore_ignore = (~crop_data[C.IS_IGNORE]) & kwargs.get('ignore_ignore', True)
 
@@ -231,33 +232,72 @@ class ModelManager:
         return os.path.join(log_dir, f'model{suffix}.pkl')
 
 
+
+
+
+
 class TrafficLightDetectionNet(MyNeuralNetworkBase):
     def __init__(self, **kwargs):
         super(TrafficLightDetectionNet, self).__init__(**kwargs)
 
-    def __getitem__ ( self, idx ):
-        if torch.is_tensor(idx):
-            assert False, "What to do??"
-
-        row = self.crop_data.iloc[idx]
-        image_path = os.path.join(self.crop_dir, row[C.PATH])
-        image = np.array(Image.open(image_path))  # Torch.read_image ?
-        return {self.IMAGE: image, self.LABEL: row[C.IS_TRUE], self.SEQ: row[self.SEQ], self.IMAGE_PATH: image_path}
-
-
     def set_net_and_loss(self):
         # Override this method to define your own network architecture and loss function
         self.layers = (
-            nn.Conv2d(self.num_in_channels, 32, kernel_size=7, padding=3),
-            nn.BatchNorm2d(32, momentum=0.1),
+            nn.Conv2d(self.num_in_channels, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
-            nn.Flatten(),
-            nn.Linear(32 * (self.w // 2) * (self.h // 2), 128),  # Adjust output size as needed
-            nn.Dropout(0.2),
+
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.Linear(128, 1),  # Output a single score for detection
+            nn.MaxPool2d(kernel_size=2),
+
+            nn.Dropout2d(0.2),  # Add dropout after convolutional layers
+            nn.Flatten(),
+
+            nn.Linear(64 * (self.w // 4) * (self.h // 4), 128),
+            nn.Dropout(0.2),  # Add dropout after the first fully connected layer
+            nn.ReLU(),
+            nn.Linear(128, 1),
         )
+
+        """
+        self.layers = (
+    nn.Conv2d(self.num_in_channels, 32, kernel_size=3, padding=1 ),
+    nn.BatchNorm2d(32),
+    nn.ReLU(),
+    nn.MaxPool2d(kernel_size=2),
+
+    # nn.Conv2d(32, 64, kernel_size=3, padding=1),  # New convolutional layer
+    # nn.BatchNorm2d(64),
+    # nn.ReLU(),
+    # nn.MaxPool2d(kernel_size=2),
+
+    nn.Flatten(),
+    nn.Linear(32 * (self.w // 2) * (self.h // 2), 128),
+    nn.Dropout(0.2),
+    nn.ReLU(),
+    nn.Linear(128, 1),
+               )
+self.layers = (
+    nn.Conv2d(self.num_in_channels, 32, kernel_size=3, padding=1 ),
+    nn.BatchNorm2d(32),
+    nn.ReLU(),
+    nn.MaxPool2d(kernel_size=2),
+
+    # nn.Conv2d(32, 64, kernel_size=3, padding=1),  # New convolutional layer
+    # nn.BatchNorm2d(64),
+    # nn.ReLU(),
+    # nn.MaxPool2d(kernel_size=2),
+
+    nn.Flatten(),
+    nn.Linear(32 * (self.w // 2) * (self.h // 2), 128),
+    nn.Dropout(0.2),
+    nn.ReLU(),
+    nn.Linear(128, 1),
+               )
+    """
         self.loss_func = nn.BCEWithLogitsLoss
         self.net = nn.Sequential(*self.layers)
 
