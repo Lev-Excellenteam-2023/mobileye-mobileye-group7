@@ -107,6 +107,7 @@ def find_light_point ( filtered_image, threshold_value ) -> (List[int], List[int
     for i in range(filtered_image.shape[0]):
         for j in range(filtered_image.shape[1]):
             if max_filtered_image[i, j] == filtered_image[i, j] and filtered_image[i, j] > threshold_value:
+
                 peaks_y.append(i)
                 peaks_x.append(j)
     return peaks_x, peaks_y
